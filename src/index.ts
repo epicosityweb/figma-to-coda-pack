@@ -1309,11 +1309,13 @@ const DevResourcesSchema = coda.makeObjectSchema({
     name: {
       type: coda.ValueType.String,
       description: "The name of the dev resource",
+      mutable: true,
     },
     url: {
       type: coda.ValueType.String,
       codaType: coda.ValueHintType.Url,
       description: "The URL of the dev resource",
+      mutable: true,
     },
     file_key: {
       type: coda.ValueType.String,
@@ -1469,6 +1471,69 @@ pack.addSyncTable({
           component: componentsMap.get(resource.node_id) || undefined,
           component_set: componentSetsMap.get(resource.node_id) || undefined,
         })),
+      };
+    },
+    executeUpdate: async function ([fileUrl, nodeIds], updates, context) {
+      // Handle edits to existing dev resources
+      const update = updates[0]; // Process one update at a time
+      const { newValue, previousValue, updatedFields } = update;
+
+      // Only process updates to mutable fields (name, url)
+      const allowedFields = ['name', 'url'];
+      const hasValidUpdates = updatedFields.some(field => allowedFields.includes(field));
+
+      if (!hasValidUpdates) {
+        throw new coda.UserVisibleError("Only name and url fields can be edited");
+      }
+
+      let response;
+      try {
+        response = await context.fetcher.fetch({
+          method: "PUT",
+          url: "https://api.figma.com/v1/dev_resources",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            dev_resources: [
+              {
+                id: newValue.id,
+                name: newValue.name,
+                url: newValue.url,
+              },
+            ],
+          }),
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          const statusError = error as coda.StatusCodeError;
+          const message = statusError.body?.message || statusError.message;
+          throw new coda.UserVisibleError(`Failed to update dev resource: ${message}`);
+        }
+        throw error;
+      }
+
+      // Check for errors in the response
+      if (response.body.errors && response.body.errors.length > 0) {
+        const errorMsg = response.body.errors[0].error;
+        throw new coda.UserVisibleError(`Failed to update dev resource: ${errorMsg}`);
+      }
+
+      // Return the updated row with all fields
+      const now = new Date().toISOString();
+      return {
+        result: [{
+          id: newValue.id,
+          name: newValue.name,
+          url: newValue.url,
+          file_key: newValue.file_key,
+          node_id: newValue.node_id,
+          created_at: newValue.created_at,
+          updated_at: now, // Update the timestamp
+          link: newValue.link,
+          component: newValue.component,
+          component_set: newValue.component_set,
+        }],
       };
     },
   },

@@ -110,13 +110,42 @@
 - [x] OAuth scope updates (file_dev_resources:read, file_dev_resources:write)
 - [x] Pack validation and deployment (Version 11)
 
+### ✅ Phase 3.6: Table Relationships & Two-Way Sync (COMPLETED)
+**Duration**: Session 10 (continued)
+**Status**: ✅ Complete
+**Target Completion**: 2025-09-17
+**Completion Date**: 2025-09-17
+
+- [x] **Table Relationships Implementation** - Bi-directional linking between FileComponents/FileComponentSets and DevResources
+- [x] ComponentsSchema enhancement with dev_resources array property
+- [x] ComponentSetsSchema enhancement with dev_resources array property
+- [x] DevResourcesSchema enhancement with component and component_set reference properties
+- [x] FileComponents sync table updated with dev resource relationship logic
+- [x] FileComponentSets sync table updated with dev resource relationship logic
+- [x] FigmaDevResources sync table updated with component references
+- [x] **Two-Way Sync Implementation** - Edit existing dev resources directly in Coda
+- [x] Mutable properties (name, url) added to DevResourcesSchema
+- [x] executeUpdate function implemented for FigmaDevResources sync table
+- [x] Pack validation and deployment (Version 12: Table Relationships, Version 13: Two-Way Sync)
+
+### 🔄 Phase 3.7: Component-Aware Creation Workflows (In Progress)
+**Duration**: Session 11
+**Status**: 🔄 Next Priority
+**Target Completion**: 2025-09-17
+
+- [ ] AddDevResourceToComponent action formula for component-context creation
+- [ ] Enhanced CreateDevResource formula with component_key parameter
+- [ ] Button column integration for streamlined workflow
+- [ ] Automation support for bulk resource setup
+- [ ] Component-aware creation testing and validation
+
 ### ⏳ Phase 4: Enterprise Features (Planned)
-**Duration**: Sessions 11-12
+**Duration**: Sessions 12-13
 **Status**: ⏳ Not Started
 **Target Completion**: 2025-02-10
 
 - [ ] Variables and variable collections sync
-- [ ] Advanced dev resources workflows
+- [ ] Advanced permissions handling
 - [ ] Advanced permissions handling
 - [ ] Enterprise feature testing
 
@@ -139,11 +168,36 @@
 | First Sync Table | 2025-01-22 | ✅ | 2025-01-17 |
 | Phase 2 Complete | 2025-01-25 | ✅ | 2025-01-17 |
 | Phase 3 Complete | 2025-01-18 | ✅ | 2025-09-17 |
-| Dev Resources Complete | 2025-01-18 | ⏳ | - |
+| Dev Resources Complete | 2025-01-18 | ✅ | 2025-09-17 |
+| Table Relationships Complete | 2025-09-17 | ✅ | 2025-09-17 |
+| Two-Way Sync Complete | 2025-09-17 | ✅ | 2025-09-17 |
 | Feature Complete | 2025-02-10 | ⏳ | - |
 | Production Ready | 2025-02-14 | ⏳ | - |
 
-## Current Sprint (Session 9 - Security Focus)
+## Current Sprint (Session 10 - Table Relationships & Two-Way Sync)
+
+### ✅ Session Goals (Table Relationships & Two-Way Sync) - COMPLETED
+- [x] **Table Relationships**: Create bi-directional linking between FileComponents/FileComponentSets and DevResources
+- [x] **Schema Enhancements**: Add dev_resources arrays and component references to schemas
+- [x] **Sync Table Updates**: Enhance sync tables with relationship fetching logic
+- [x] **Two-Way Sync**: Enable editing existing dev resources directly in Coda tables
+- [x] **executeUpdate Implementation**: Add PUT API support for dev resource updates
+- [x] **Testing & Deployment**: Validate and deploy Version 12 (relationships) and Version 13 (two-way sync)
+
+### Completed in Session 10 (2025-09-17) - Table Relationships & Two-Way Sync
+- [x] **TABLE RELATIONSHIPS PHASE**: Complete bi-directional linking implementation
+- [x] **SCHEMA ENHANCEMENTS**: ComponentsSchema and ComponentSetsSchema with dev_resources arrays
+- [x] **REVERSE REFERENCES**: DevResourcesSchema with component and component_set properties
+- [x] **SYNC TABLE LOGIC**: Enhanced FileComponents and FileComponentSets with dev resource fetching
+- [x] **DEVRESOURCES UPDATES**: FigmaDevResources with component reference fetching
+- [x] **VERSION 12 DEPLOYMENT**: Successfully uploaded pack with table relationships
+- [x] **TWO-WAY SYNC IMPLEMENTATION**: Added mutable properties (name, url) to DevResourcesSchema
+- [x] **EXECUTEUPDATE FUNCTION**: Implemented PUT /v1/dev_resources integration
+- [x] **VERSION 13 DEPLOYMENT**: Successfully uploaded pack with two-way sync
+- [x] **COMPREHENSIVE TESTING**: All functionality validated and working
+- [x] **COMPLETED PHASE 3.6**: Table relationships and two-way sync fully functional
+
+## Previous Sprint (Session 9 - Security Focus)
 
 ### ✅ Session Goals (Security Remediation & Repository Setup) - COMPLETED
 - [x] Conduct comprehensive security review of codebase
