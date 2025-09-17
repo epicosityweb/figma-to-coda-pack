@@ -1,0 +1,39 @@
+{
+  "name": "figma-coda-pack",
+  "version": "0.1.0",
+  "description": "A Coda Pack for syncing Figma design systems, components, and variables",
+  "main": "dist/bundle.js",
+  "scripts": {
+    "build": "npx coda build",
+    "validate": "npx coda validate",
+    "upload": "npx coda upload",
+    "watch": "npx coda execute --watch",
+    "test": "npx coda execute",
+    "compile": "tsc",
+    "dev": "npm run compile && npm run validate"
+  },
+  "keywords": [
+    "coda",
+    "pack",
+    "figma",
+    "design-system",
+    "components",
+    "oauth2"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "@codahq/packs-sdk": "^1.8.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.0",
+    "@types/node": "^18.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "coda": {
+    "packId": "YOUR_PACK_ID_HERE",
+    "packVersion": "1"
+  }
+}

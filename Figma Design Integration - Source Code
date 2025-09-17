@@ -1,0 +1,1997 @@
+import * as coda from "@codahq/packs-sdk";
+
+
+//
+// Authentication 
+//
+
+export const pack = coda.newPack();
+pack.addNetworkDomain("figma.com");
+pack.setUserAuthentication({
+  type: coda.AuthenticationType.OAuth2,
+  authorizationUrl: "https://www.figma.com/oauth",
+  tokenUrl: "https://www.figma.com/api/oauth/token",
+  scopes: ["file_read"],
+});
+
+//
+// Schemas
+//
+
+const UsersSchema = coda.makeObjectSchema({
+  properties: {
+    id: { 
+      type: coda.ValueType.String,
+      description: "The unique identifier for the user.",
+    },
+    handle: { 
+      type: coda.ValueType.String,
+      description: "The handle or username of the user.",
+    },
+    img_url: { 
+      type: coda.ValueType.String, 
+      codaType: coda.ValueHintType.ImageReference,
+      description: "The URL of the user's profile image.",
+    },
+  },
+  displayProperty: "handle",
+  idProperty: "id",
+  featuredProperties: ["handle", "img_url"]
+});
+
+const FramesSchema = coda.makeObjectSchema({
+  properties: {
+    name: { 
+      type: coda.ValueType.String,
+      description: "The name of the frame."
+    },
+    nodeId: { 
+      type: coda.ValueType.String,
+      description: "The unique identifier for the node within the frame."
+    },
+    pageId: { 
+      type: coda.ValueType.String,
+      description: "The unique identifier for the page containing the frame."
+    },
+    pageName: { 
+      type: coda.ValueType.String,
+      description: "The name of the page containing the frame."
+    },
+    backgroundColor: { 
+      type: coda.ValueType.String,
+      description: "The background color of the frame."
+    },
+  },
+  displayProperty: "name",
+  idProperty: "nodeId",
+  featuredProperties: ["name", "nodeId"]
+});
+
+
+// const FigmaCardSchema = coda.makeObjectSchema({
+//   properties: {
+//     name: { type: coda.ValueType.String },
+//     lastModified: { type: coda.ValueType.String, codaType: coda.ValueHintType.Date },
+//     thumbnailUrl: { type: coda.ValueType.String, codaType: coda.ValueHintType.ImageReference },
+//     version: { type: coda.ValueType.String },
+//     role: { type: coda.ValueType.String },
+//     editorType: { type: coda.ValueType.String },
+//     linkAccess: { type: coda.ValueType.String },
+//     nodes: FramesSchema,
+//   },
+//   displayProperty: "name",
+//   titleProperty: "name",
+//   subtitleProperties: [
+//     "lastModified",
+//     "role",
+//     "editorType",
+//   ],
+//   snippetProperty: "description",
+//   imageProperty: "thumbnailUrl",
+//   linkProperty: "linkAccess",
+// });
+
+const ComponentsSchema = coda.makeObjectSchema({
+  properties: {
+    key: {
+      type: coda.ValueType.String,
+      description: "The unique key for the component."
+    },
+    file_key: {
+      type: coda.ValueType.String,
+      description: "The key associated with the file containing the component."
+    },
+    node_id: {
+      type: coda.ValueType.String,
+      description: "The unique identifier for the node associated with the component."
+    },
+    thumbnail_url: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.ImageReference,
+      description: "The URL for the component's thumbnail image."
+    },
+    name: {
+      type: coda.ValueType.String,
+      description: "The name of the component."
+    },
+    description: {
+      type: coda.ValueType.String,
+      description: "A brief description of the component."
+    },
+    description_rt: {
+      type: coda.ValueType.String,
+      description: "A more detailed, rich text description of the component."
+    },
+    created_at: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.DateTime,
+      description: "The date and time when the component was created."
+    },
+    updated_at: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.DateTime,
+      description: "The date and time when the component was last updated."
+    },
+    user: {
+      ...UsersSchema,
+      description: "Information about the user associated with the component."
+    },
+    containing_frame: {
+      ...FramesSchema,
+      description: "Details about the frame containing the component."
+    },
+    link: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Url,
+      description: "The URL link to the component."
+    },
+  },
+  displayProperty: "name",
+  titleProperty: "name",
+  subtitleProperties: [
+    "description",
+    { property: "updated_at", label: "Updated At" },
+  ],
+  idProperty: "key",
+  snippetProperty: "description",
+  imageProperty: "thumbnail_url",
+  linkProperty: "link",
+  featuredProperties: ["name", "description", "thumbnail_url", "user", "created_at", "link"]
+});
+
+const ComponentsMiniSchema = coda.makeObjectSchema({
+  properties: {
+    key: { type: coda.ValueType.String, description: "The unique key of the component." },
+    name: { type: coda.ValueType.String, description: "The name of the component." },
+    description: { type: coda.ValueType.String, description: "The description of the component." },
+    remote: { type: coda.ValueType.Boolean, description: "Indicates if the component is remote." },
+    documentationLinks: { type: coda.ValueType.String, description: "The documentation links of the component." },
+  },
+  idProperty: "key",
+  displayProperty: "name",
+  titleProperty: "name",
+});
+
+const ComponentSetsSchema = coda.makeObjectSchema({
+  properties: {
+    key: {
+      type: coda.ValueType.String,
+      description: "The unique key for the component set."
+    },
+    file_key: {
+      type: coda.ValueType.String,
+      description: "The key associated with the file containing the component set."
+    },
+    node_id: {
+      type: coda.ValueType.String,
+      description: "The unique identifier for the node associated with the component set."
+    },
+    thumbnail_url: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.ImageReference,
+      description: "The URL for the component set's thumbnail image."
+    },
+    name: {
+      type: coda.ValueType.String,
+      description: "The name of the component set."
+    },
+    description: {
+      type: coda.ValueType.String,
+      description: "A brief description of the component set."
+    },
+    updated_at: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.DateTime,
+      description: "The date and time when the component set was last updated."
+    },
+    created_at: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.DateTime,
+      description: "The date and time when the component set was created."
+    },
+    user: {
+      ...UsersSchema,
+      description: "Information about the user associated with the component set."
+    },
+    containing_frame: {
+      ...FramesSchema,
+      description: "Details about the frame containing the component set."
+    },
+    link: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Url,
+      description: "The URL link to the component set."
+    },
+  },
+  displayProperty: "name",
+  idProperty: "key",
+  featuredProperties: ["name", "description", "thumbnail_url", "user", "created_at", "link"]
+});
+
+
+const StylesSchema = coda.makeSchema({
+  type: coda.ValueType.Object,
+  properties: {
+    key: {
+      type: coda.ValueType.String,
+      description: "The unique key for the style."
+    },
+    file_key: {
+      type: coda.ValueType.String,
+      description: "The key associated with the file containing the style."
+    },
+    node_id: {
+      type: coda.ValueType.String,
+      description: "The unique identifier for the node associated with the style."
+    },
+    style_type: {
+      type: coda.ValueType.String,
+      description: "The type of the style."
+    },
+    thumbnail_url: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.ImageReference,
+      description: "The URL for the style's thumbnail image."
+    },
+    name: {
+      type: coda.ValueType.String,
+      description: "The name of the style."
+    },
+    description: {
+      type: coda.ValueType.String,
+      description: "A brief description of the style."
+    },
+    created_at: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.DateTime,
+      description: "The date and time when the style was created."
+    },
+    updated_at: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.DateTime,
+      description: "The date and time when the style was last updated."
+    },
+    sort_position: {
+      type: coda.ValueType.String,
+      description: "The position of the style in a sorted list."
+    },
+    user: {
+      ...UsersSchema,
+      description: "Information about the user associated with the style."
+    },
+  },
+  displayProperty: "name",
+  titleProperty: "name",
+  subtitleProperties: [
+    "style_type",
+    { property: "updated_at", label: "Updated At" },
+  ],
+  snippetProperty: "description",
+  imageProperty: "thumbnail_url",
+  idProperty: "key",
+  featuredProperties: ["name", "description", "style_type", "thumbnail_url", "user", "created_at"]
+});
+
+
+//
+// Tables
+// 
+
+pack.addSyncTable({
+  name: "TeamComponents",
+  description: "Get a list of all team components",
+  identityName: "TeamComponent",
+  schema: ComponentsSchema,
+  formula: {
+    name: "TeamComponents",
+    description: "Get a list of all team components",
+    parameters: [
+      coda.makeParameter({
+        type: coda.ParameterType.String,
+        name: "TeamURL",
+        description: "The URL of your Figma team",
+      }),
+    ],
+    execute: async function ([teamURL], context) {
+
+      const regex = /https:\/\/www\.figma\.com\/files\/(?:\d+\/)?team\/(\d+)/;
+      const matches = teamURL.match(regex);
+      const teamID = matches ? matches[1] : null;
+
+      let url = "https://api.figma.com/v1/teams/" + teamID + "/components";
+
+      if (context.sync.continuation?.after) {
+        url += `?after=${context.sync.continuation.after}`;
+      }
+
+      let response;
+      try {
+        response = await context.fetcher.fetch({
+          method: "GET",
+          url: url,
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          let statusError = error as coda.StatusCodeError;
+          let message = statusError.body?.message;
+          if (message) {
+            throw new coda.UserVisibleError(message);
+          }
+        }
+        throw error;
+      }
+
+      let components = response.body.meta.components;
+
+      let rows = [];
+      for (let c of components) {
+        let row = {
+          key: c.key,
+          file_key: c.file_key,
+          node_id: c.node_id,
+          thumbnail_url: c.thumbnail_url,
+          name: c.name,
+          description: c.description,
+          description_rt: c.description_rt,
+          created_at: c.created_at,
+          updated_at: c.updated_at,
+          containing_frame: {
+            name: c.containing_frame.name,
+            nodeId: c.containing_frame.nodeId,
+            pageId: c.containing_frame.pageId,
+            pageName: c.containing_frame.pageName,
+            backgroundColor: c.containing_frame.backgroundColor,
+          },
+          user: {
+            id: c.user.id,
+            handle: c.user.handle,
+            img_url: c.user.img_url,
+          },
+          link: `https://www.figma.com/file/${c.file_key}/?node-id=${encodeURIComponent(c.node_id)}`,
+        };
+        rows.push(row);
+      }
+
+      let continuation = null;
+      if (response.body.meta.cursor.after) {
+        continuation = {
+          after: response.body.meta.cursor.after,
+        };
+      }
+
+      return {
+        result: rows,
+        continuation: continuation,
+      };
+    },
+  },
+});
+
+
+pack.addSyncTable({
+  name: "TeamComponentSets",
+  description: "Get a list of all team component sets",
+  identityName: "TeamComponentSet",
+  schema: ComponentSetsSchema,
+  formula: {
+    name: "TeamComponentSets",
+    description: "Get a list of all team component set",
+    parameters: [
+      coda.makeParameter({
+        type: coda.ParameterType.String,
+        name: "TeamURL",
+        description: "The URL of your Figma team",
+      }),
+    ],
+    execute: async function ([teamURL], context) {
+
+      const regex = /https:\/\/www\.figma\.com\/files\/(?:\d+\/)?team\/(\d+)/;
+      const matches = teamURL.match(regex);
+      const teamID = matches ? matches[1] : null;
+
+      let url = "https://api.figma.com/v1/teams/" + teamID + "/component_sets";
+
+      if (context.sync.continuation?.after) {
+        url += `?after=${context.sync.continuation.after}`;
+      }
+
+      let response;
+      try {
+        response = await context.fetcher.fetch({
+          method: "GET",
+          url: url,
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          let statusError = error as coda.StatusCodeError;
+          let message = statusError.body?.message;
+          if (message) {
+            throw new coda.UserVisibleError(message);
+          }
+        }
+        throw error;
+      }
+
+      let components = response.body.meta.component_sets;
+
+      let rows = [];
+      for (let c of components) {
+        let row = {
+          key: c.key,
+          file_key: c.file_key,
+          node_id: c.node_id,
+          thumbnail_url: c.thumbnail_url,
+          name: c.name,
+          description: c.description,
+          created_at: c.created_at,
+          updated_at: c.updated_at,
+          containing_frame: {
+            name: c.containing_frame.name,
+            nodeId: c.containing_frame.nodeId,
+            pageId: c.containing_frame.pageId,
+            pageName: c.containing_frame.pageName,
+            backgroundColor: c.containing_frame.backgroundColor,
+          },
+          user: {
+            id: c.user.id,
+            handle: c.user.handle,
+            img_url: c.user.img_url,
+          },
+          link: `https://www.figma.com/file/${c.file_key}/?node-id=${encodeURIComponent(c.node_id)}`,
+        };
+        rows.push(row);
+      }
+
+      let continuation = null;
+      if (response.body.meta.cursor.after) {
+        continuation = {
+          after: response.body.meta.cursor.after,
+        };
+      }
+
+      return {
+        result: rows,
+        continuation: continuation,
+      };
+    },
+  },
+});
+
+pack.addSyncTable({
+  name: "FileComponents",
+  description: "Get a list of all file components",
+  identityName: "FileComponent",
+  schema: ComponentsSchema,
+  formula: {
+    name: "FileComponents",
+    description: "Get a list of all file components",
+    parameters: [
+      coda.makeParameter({
+        type: coda.ParameterType.String,
+        name: "FileURL",
+        description: "The URL of your Figma team",
+      }),
+    ],
+    execute: async function ([fileURL], context) {
+
+      const regex = /https:\/\/www\.figma\.com\/file\/(\w+)\//;
+      const matches = fileURL.match(regex);
+      const fileKey = matches ? matches[1] : null;
+
+      let url = "https://api.figma.com/v1/files/" + fileKey + "/components?page_size=100";
+
+      if (context.sync.continuation) {
+        url = "https://api.figma.com/v1/files/" + fileKey + "/components?after=" + context.sync.continuation + "&page_size=100";
+      }
+
+      let response;
+      try {
+        response = await context.fetcher.fetch({
+          method: "GET",
+          url: url,
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          let statusError = error as coda.StatusCodeError;
+          let message = statusError.body?.message;
+          if (message) {
+            throw new coda.UserVisibleError(message);
+          }
+        }
+        throw error;
+      }
+
+      let components = response.body.meta.components;
+
+      let rows = [];
+      for (let c of components) {
+        let row = {
+          key: c.key,
+          file_key: c.file_key,
+          node_id: c.node_id,
+          thumbnail_url: c.thumbnail_url,
+          name: c.name,
+          description: c.description,
+          description_rt: c.description_rt,
+          created_at: c.created_at,
+          updated_at: c.updated_at,
+          containing_frame: {
+            name: c.containing_frame.name,
+            nodeId: c.containing_frame.nodeId,
+            pageId: c.containing_frame.pageId,
+            pageName: c.containing_frame.pageName,
+            backgroundColor: c.containing_frame.backgroundColor,
+          },
+          user: {
+            id: c.user.id,
+            handle: c.user.handle,
+            img_url: c.user.img_url,
+          },
+          link: `https://www.figma.com/file/${c.file_key}/?node-id=${encodeURIComponent(c.node_id)}`,
+        };
+        rows.push(row)
+      }
+
+      let continuation;
+      if (response.body.meta.hasOwnProperty("cursor") && response.body.meta.cursor.after != null) {
+        continuation = response.body.meta.cursor.after;
+      }
+
+      return {
+        result: rows,
+        continuation: continuation,
+      };
+    },
+  },
+});
+
+pack.addSyncTable({
+  name: "FileComponentSets",
+  description: "Get a list of all file component sets",
+  identityName: "FileComponentSet",
+  schema: ComponentSetsSchema,
+  formula: {
+    name: "FileComponentSets",
+    description: "Get a list of all file component sets",
+    parameters: [
+      coda.makeParameter({
+        type: coda.ParameterType.String,
+        name: "FileURL",
+        description: "The URL of your Figma team",
+      }),
+    ],
+    execute: async function ([fileURL], context) {
+
+      const regex = /https:\/\/www\.figma\.com\/file\/(\w+)\//;
+      const matches = fileURL.match(regex);
+      const fileKey = matches ? matches[1] : null;
+
+      let url = "https://api.figma.com/v1/files/" + fileKey + "/component_sets?page_size=100";
+
+      if (context.sync.continuation) {
+        url = "https://api.figma.com/v1/files/" + fileKey + "/component_sets?after=" + context.sync.continuation + "&page_size=100";
+      }
+
+      let response;
+      try {
+        response = await context.fetcher.fetch({
+          method: "GET",
+          url: url,
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          let statusError = error as coda.StatusCodeError;
+          let message = statusError.body?.message;
+          if (message) {
+            throw new coda.UserVisibleError(message);
+          }
+        }
+        throw error;
+      }
+
+      let components = response.body.meta.component_sets;
+
+      let rows = [];
+      for (let c of components) {
+        let row = {
+          key: c.key,
+          file_key: c.file_key,
+          node_id: c.node_id,
+          thumbnail_url: c.thumbnail_url,
+          name: c.name,
+          description: c.description,
+          created_at: c.created_at,
+          updated_at: c.updated_at,
+          containing_frame: {
+            name: c.containing_frame.name,
+            nodeId: c.containing_frame.nodeId,
+            pageId: c.containing_frame.pageId,
+            pageName: c.containing_frame.pageName,
+            backgroundColor: c.containing_frame.backgroundColor,
+          },
+          user: {
+            id: c.user.id,
+            handle: c.user.handle,
+            img_url: c.user.img_url,
+          },
+          link: `https://www.figma.com/file/${c.file_key}/?node-id=${encodeURIComponent(c.node_id)}`,
+        };
+        rows.push(row)
+      }
+
+      let continuation;
+      if (response.body.meta.hasOwnProperty("cursor") && response.body.meta.cursor.after != null) {
+        continuation = response.body.meta.cursor.after;
+      }
+
+      return {
+        result: rows,
+        continuation: continuation,
+      };
+    },
+  },
+});
+
+pack.addSyncTable({
+  name: "TeamStyles",
+  description: "Get a list of all team styles",
+  identityName: "TeamStyle",
+  schema: StylesSchema,
+  formula: {
+    name: "TeamStyles",
+    description: "Get a list of all team styles",
+    parameters: [
+      coda.makeParameter({
+        type: coda.ParameterType.String,
+        name: "TeamURL",
+        description: "The URL of your Figma team",
+      }),
+    ],
+    execute: async function ([teamURL], context) {
+
+      const regex = /https:\/\/www\.figma\.com\/files\/(?:\d+\/)?team\/(\d+)/;
+      const matches = teamURL.match(regex);
+      const teamID = matches ? matches[1] : null;
+
+      let url = "https://api.figma.com/v1/teams/" + teamID + "/styles";
+
+      if (context.sync.continuation?.after) {
+        url += `?after=${context.sync.continuation.after}`;
+      }
+
+      let response;
+      try {
+        response = await context.fetcher.fetch({
+          method: "GET",
+          url: url,
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          let statusError = error as coda.StatusCodeError;
+          let message = statusError.body?.message;
+          if (message) {
+            throw new coda.UserVisibleError(message);
+          }
+        }
+        throw error;
+      }
+
+      let styles = response.body.meta.styles;
+
+      let rows = [];
+      for (let style of styles) {
+        let row = {
+          key: style.key,
+          file_key: style.file_key,
+          node_id: style.node_id,
+          style_type: style.style_type,
+          thumbnail_url: style.thumbnail_url,
+          name: style.name,
+          description: style.description,
+          created_at: style.created_at,
+          updated_at: style.updated_at,
+          sort_position: style.sort_position,
+          user: {
+            id: style.user.id,
+            handle: style.user.handle,
+            img_url: style.user.img_url,
+          },
+        };
+        rows.push(row);
+      }
+
+      let continuation = null;
+      if (response.body.meta.cursor.after) {
+        continuation = {
+          after: response.body.meta.cursor.after,
+        };
+      }
+
+      return {
+        result: rows,
+        continuation: continuation,
+      };
+    },
+  },
+});
+
+pack.addSyncTable({
+  name: "FileStyles",
+  description: "Get a list of all file styles",
+  identityName: "FileStyle",
+  schema: StylesSchema,
+  formula: {
+    name: "FileStyles",
+    description: "Get a list of all file styles",
+    parameters: [
+      coda.makeParameter({
+        type: coda.ParameterType.String,
+        name: "FileURL",
+        description: "The URL of your Figma team",
+      }),
+    ],
+    execute: async function ([fileURL], context) {
+
+      const regex = /https:\/\/www\.figma\.com\/file\/(\w+)\//;
+      const matches = fileURL.match(regex);
+      const fileKey = matches ? matches[1] : null;
+
+      let url = "https://api.figma.com/v1/files/" + fileKey + "/styles?page_size=100";
+
+      if (context.sync.continuation) {
+        url = "https://api.figma.com/v1/files/" + fileKey + "/styles?after=" + context.sync.continuation + "&page_size=100";
+      }
+
+      let response;
+      try {
+        response = await context.fetcher.fetch({
+          method: "GET",
+          url: url,
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          let statusError = error as coda.StatusCodeError;
+          let message = statusError.body?.message;
+          if (message) {
+            throw new coda.UserVisibleError(message);
+          }
+        }
+        throw error;
+      }
+
+      let styles = response.body.meta.styles;
+
+      let rows = [];
+      for (let style of styles) {
+        let row = {
+          key: style.key,
+          file_key: style.file_key,
+          node_id: style.node_id,
+          style_type: style.style_type,
+          thumbnail_url: style.thumbnail_url,
+          name: style.name,
+          description: style.description,
+          created_at: style.created_at,
+          updated_at: style.updated_at,
+          sort_position: style.sort_position,
+          user: {
+            id: style.user.id,
+            handle: style.user.handle,
+            img_url: style.user.img_url,
+          },
+        };
+        rows.push(row);
+      }
+
+      let continuation;
+      if (response.body.meta.hasOwnProperty("cursor") && response.body.meta.cursor.after != null) {
+        continuation = response.body.meta.cursor.after;
+      }
+
+      return {
+        result: rows,
+        continuation: continuation,
+      };
+    },
+  },
+});
+
+//
+// Cards
+//
+
+pack.addFormula({
+  name: "ComponentCard",
+  description: "Fetches information about a Figma component",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "componentKey",
+      description: "Provide Component Key. You can get the keys from Figma Components table",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: ComponentsSchema,
+  execute: async function ([componentKey], context) {
+    const url = "https://api.figma.com/v1/components/" + componentKey;
+
+    let response;
+    try {
+      response = await context.fetcher.fetch({
+        method: "GET",
+        url: url,
+      });
+    } catch (error) {
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        let statusError = error as coda.StatusCodeError;
+        let message = statusError.body?.message;
+        if (message) {
+          throw new coda.UserVisibleError(message);
+        }
+      }
+      throw error;
+    }
+
+    const component = response.body.meta;
+
+    return {
+      key: component.key,
+      file_key: component.file_key,
+      node_id: component.node_id,
+      thumbnail_url: component.thumbnail_url,
+      name: component.name,
+      description: component.description,
+      updated_at: component.updated_at,
+      created_at: component.created_at,
+      user: {
+        id: component.user.id,
+        handle: component.user.handle,
+        img_url: component.user.img_url,
+      },
+      containing_frame: {
+        pageId: component.containing_frame.pageId,
+        pageName: component.containing_frame.pageName,
+      },
+      link: `https://www.figma.com/file/${component.file_key}/?node-id=${encodeURIComponent(component.node_id)}`,
+    };
+  },
+});
+
+pack.addFormula({
+  name: "ComponentSetCard",
+  description: "Fetches information about a Figma component set",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "componentSetKey",
+      description: "Provide Component Set Key. You can get the keys from Figma Component Sets table",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: ComponentsSchema,
+  execute: async function ([componentKey], context) {
+    const url = "https://api.figma.com/v1/component_sets/" + componentKey;
+
+    let response;
+    try {
+      response = await context.fetcher.fetch({
+        method: "GET",
+        url: url,
+      });
+    } catch (error) {
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        let statusError = error as coda.StatusCodeError;
+        let message = statusError.body?.message;
+        if (message) {
+          throw new coda.UserVisibleError(message);
+        }
+      }
+      throw error;
+    }
+
+    const component = response.body.meta;
+
+    return {
+      key: component.key,
+      file_key: component.file_key,
+      node_id: component.node_id,
+      thumbnail_url: component.thumbnail_url,
+      name: component.name,
+      description: component.description,
+      updated_at: component.updated_at,
+      created_at: component.created_at,
+      user: {
+        id: component.user.id,
+        handle: component.user.handle,
+        img_url: component.user.img_url,
+      },
+      containing_frame: {
+        pageId: component.containing_frame.pageId,
+        pageName: component.containing_frame.pageName,
+      },
+      link: `https://www.figma.com/file/${component.file_key}/?node-id=${encodeURIComponent(component.node_id)}`,
+    };
+  },
+});
+
+
+pack.addFormula({
+  name: "StyleCard",
+  description: "Fetches information about a Figma style",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "StyleKey",
+      description: "Provide Style Key. You can get the keys from Figma Styles table",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: StylesSchema,
+  execute: async function ([styleKey], context) {
+    const url = "https://api.figma.com/v1/styles/" + styleKey;
+
+    let response;
+    try {
+      response = await context.fetcher.fetch({
+        method: "GET",
+        url: url,
+      });
+    } catch (error) {
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        let statusError = error as coda.StatusCodeError;
+        let message = statusError.body?.message;
+        if (message) {
+          throw new coda.UserVisibleError(message);
+        }
+      }
+      throw error;
+    }
+
+    const style = response.body.meta;
+
+    return {
+      key: style.key,
+      file_key: style.file_key,
+      node_id: style.node_id,
+      style_type: style.style_type,
+      thumbnail_url: style.thumbnail_url,
+      name: style.name,
+      description: style.description,
+      updated_at: style.updated_at,
+      created_at: style.created_at,
+      sort_position: style.sort_position,
+      user: {
+        id: style.user.id,
+        handle: style.user.handle,
+        img_url: style.user.img_url,
+      },
+    };
+  },
+});
+
+//
+// Formulas
+//
+
+const DocumentSchema = coda.makeObjectSchema({
+  properties: {
+    id: { type: coda.ValueType.String, description: "The ID of the document." },
+    name: { type: coda.ValueType.String, description: "The name of the document." },
+    type: { type: coda.ValueType.String, description: "The type of the document." },
+    scrollBehavior: { type: coda.ValueType.String, description: "The scroll behavior of the document." },
+    blendMode: { type: coda.ValueType.String, description: "The blend mode of the document." },
+    absoluteBoundingBox: {
+      type: coda.ValueType.Object,
+      description: "The absolute bounding box of the document.",
+      properties: {
+        x: { type: coda.ValueType.Number, description: "The x-coordinate of the bounding box." },
+        y: { type: coda.ValueType.Number, description: "The y-coordinate of the bounding box." },
+        width: { type: coda.ValueType.Number, description: "The width of the bounding box." },
+        height: { type: coda.ValueType.Number, description: "The height of the bounding box." },
+      },
+    },
+    constraints: {
+      type: coda.ValueType.Object,
+      description: "The constraints of the document.",
+      properties: {
+        vertical: { type: coda.ValueType.String, description: "The vertical constraint." },
+        horizontal: { type: coda.ValueType.String, description: "The horizontal constraint." },
+      },
+    },
+    layoutAlign: { type: coda.ValueType.String, description: "The layout alignment of the document." },
+    layoutGrow: { type: coda.ValueType.Number, description: "The layout growth of the document." },
+    clipsContent: { type: coda.ValueType.Boolean, description: "Indicates if the document clips content." },
+    backgroundColor: {
+      type: coda.ValueType.Object,
+      description: "The background color of the document.",
+      properties: {
+        r: { type: coda.ValueType.Number, description: "Red component of the color." },
+        g: { type: coda.ValueType.Number, description: "Green component of the color." },
+        b: { type: coda.ValueType.Number, description: "Blue component of the color." },
+        a: { type: coda.ValueType.Number, description: "Alpha (transparency) component of the color." },
+      },
+    },
+    strokeWeight: { type: coda.ValueType.Number, description: "The stroke weight of the document." },
+    strokeAlign: { type: coda.ValueType.String, description: "The stroke alignment of the document." },
+  },
+  idProperty: "id",
+  displayProperty: "name",
+  titleProperty: "name",
+});
+
+pack.addFormula({
+  name: "GetNodeDocument",
+  description: "Retrieve the document information for the specified nodes in a Figma file.",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "fileKey",
+      description: "The key of the Figma file."
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.StringArray,
+      name: "nodeIds",
+      description: "The IDs of the nodes to retrieve."
+    }),
+  ],
+  schema: DocumentSchema,
+  resultType: coda.ValueType.Object,
+  // The execute function should be async because it makes a network request
+  execute: async function([fileKey, nodeIds], context) {
+    // Join the node IDs into a comma-separated string
+    let ids = nodeIds.join(',');
+
+    let url = `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${ids}&depth=0`;
+
+    let response;
+    try {
+      response = await context.fetcher.fetch({
+        method: "GET",
+        url: url,
+      });
+    } catch (error) {
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        let statusError = error as coda.StatusCodeError;
+        let message = statusError.body?.message;
+        if (message) {
+          throw new coda.UserVisibleError(message);
+        }
+      }
+      throw error;
+    }
+
+    // The document data is nested within the response, so we extract it here
+    let document = response.body.nodes[Object.keys(response.body.nodes)[0]].document;
+
+    return document;
+  },
+});
+
+
+// const FillSchema = coda.makeObjectSchema({
+//   properties: {
+//     blendMode: { type: coda.ValueType.String, description: "The blend mode of the fill." },
+//     visible: { type: coda.ValueType.Boolean, description: "Indicates if the fill is visible." },
+//     type: { type: coda.ValueType.String, description: "The type of the fill." },
+//     color: {
+//       type: coda.ValueType.Object,
+//       description: "The color of the fill.",
+//       properties: {
+//         r: { type: coda.ValueType.Number, description: "Red component of the color." },
+//         g: { type: coda.ValueType.Number, description: "Green component of the color." },
+//         b: { type: coda.ValueType.Number, description: "Blue component of the color." },
+//         a: { type: coda.ValueType.Number, description: "Alpha (transparency) component of the color." },
+//       },
+//     },
+//   },
+// });
+
+// pack.addFormula({
+//   name: "GetNodeFills",
+//   description: "Retrieve the fills information for the specified nodes in a Figma file.",
+//   parameters: [
+//     coda.makeParameter({
+//       type: coda.ParameterType.String,
+//       name: "fileKey",
+//       description: "The key of the Figma file."
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.StringArray,
+//       name: "nodeId",
+//       description: "The ID of the node to retrieve."
+//     }),
+//   ],
+//   schema: FillSchema,
+//   resultType: coda.ValueType.Object,
+//   // The execute function should be async because it makes a network request
+//   execute: async function([fileKey, nodeId], context) {
+//     // Join the node IDs into a comma-separated string
+
+//     let url = `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${nodeId}&depth=0`;
+
+//     let response;
+//     try {
+//       response = await context.fetcher.fetch({
+//         method: "GET",
+//         url: url,
+//       });
+//     } catch (error) {
+//       if (coda.StatusCodeError.isStatusCodeError(error)) {
+//         let statusError = error as coda.StatusCodeError;
+//         let message = statusError.body?.message;
+//         if (message) {
+//           throw new coda.UserVisibleError(message);
+//         }
+//       }
+//       throw error;
+//     }
+
+//     let fills;
+//     if (response.body.nodes[nodeId]?.document.fills) {
+//       fills = response.body.nodes[nodeId].document.fills;
+//     } else {
+//       throw new coda.UserVisibleError("No fills data found for the provided node ID");
+//     }
+
+//     return fills;
+//   },
+// });
+
+
+const FigmaLocalVariableSchema = coda.makeObjectSchema({
+  properties: {
+    id: {
+      type: coda.ValueType.String,
+      description: "The unique identifier of the variable.",
+    },
+    name: {
+      type: coda.ValueType.String,
+      description: "The name of the variable.",
+    },
+    variableCollectionId: {
+      type: coda.ValueType.String,
+      description: "The ID of the variable collection that contains this variable.",
+    },
+    resolvedType: {
+      type: coda.ValueType.String,
+      description: "The resolved type of the variable. Can be 'BOOLEAN', 'FLOAT', 'STRING', or 'COLOR'.",
+    },
+    modeId: {
+      type: coda.ValueType.String,
+      description: "The ID of the mode.",
+    },
+    value: {
+      type: coda.ValueType.String,
+      description: "The value for the variable in the respective mode.",
+    },
+    remote: {
+      type: coda.ValueType.Boolean,
+      description: "Indicates if the variable is remote.",
+    },
+  },
+  idProperty: "id",
+  displayProperty: "name",
+  featuredProperties: ["name","resolvedType", "modeId", "value", "remote"]
+});
+
+pack.addSyncTable({
+  name: "FigmaLocalVariables",
+  description: "Get a list of local variables from a Figma file along with their values in different modes. Note: Available only for Figma Enterprise plan.",
+  identityName: "FigmaLocalVariable",
+  schema: FigmaLocalVariableSchema,
+  formula: {
+    name: "FetchFigmaLocalVariables",
+    description: "Fetches the local variables from a Figma file along with their values in different modes.",
+    parameters: [
+      coda.makeParameter({
+        type: coda.ParameterType.String,
+        name: "fileKey",
+        description: "The key of the Figma file.",
+      }),
+    ],
+    execute: async function ([fileKey], context) {
+      let url = `https://api.figma.com/v1/files/${fileKey}/variables/local`;
+
+      let response;
+      try {
+        response = await context.fetcher.fetch({
+          method: 'GET',
+          url: url,
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          let statusError = error as coda.StatusCodeError;
+          let message = statusError.body?.message;
+          if (message) {
+            throw new coda.UserVisibleError(message);
+          }
+        }
+        throw error;
+      }
+
+      // Extract the variables part of the response
+      const variablesObj = response.body.meta.variables;
+
+      // Flatten the variables into an array of rows, with valuesByMode flattened
+      const rows = [];
+      for (const variableId in variablesObj) {
+        const variable = variablesObj[variableId];
+        for (const modeId in variable.valuesByMode) {
+          rows.push({
+            id: variable.id,
+            name: variable.name,
+            variableCollectionId: variable.variableCollectionId,
+            resolvedType: variable.resolvedType,
+            modeId: modeId,
+            value: variable.valuesByMode[modeId],
+            remote: variable.remote,
+          });
+        }
+      }
+
+      return {
+        result: rows,
+      };
+    },
+  },
+});
+
+const FigmaLocalVariableCollectionSchema = coda.makeObjectSchema({
+  properties: {
+    id: {
+      type: coda.ValueType.String,
+      description: "The unique identifier of the variable collection.",
+    },
+    name: {
+      type: coda.ValueType.String,
+      description: "The name of the variable collection.",
+    },
+    modes: {
+      type: coda.ValueType.Array,
+      items: coda.makeObjectSchema({
+        type: coda.ValueType.Object,
+        properties: {
+          id: {
+            type: coda.ValueType.String,
+            description: "The unique identifier of the mode within the variable collection.",
+          },
+          name: {
+            type: coda.ValueType.String,
+            description: "The name of the mode within the variable collection.",
+          },
+        },
+      }),
+      description: "The modes available in this variable collection.",
+    },
+    defaultModeId: {
+      type: coda.ValueType.String,
+      description: "The ID of the default mode in this variable collection.",
+    },
+    remote: {
+      type: coda.ValueType.Boolean,
+      description: "Indicates if the variable collection is remote.",
+    },
+  },
+  idProperty: "id",
+  displayProperty: "name",
+  featuredProperties: ["name", "modes", "defaultModeId", "remote"],
+});
+
+pack.addSyncTable({
+  name: "FigmaLocalVariableCollections",
+  description: "Get a list of local variable collections from a Figma file along with their modes. Note: Available only for Figma Enterprise plan.",
+  identityName: "FigmaLocalVariableCollection",
+  schema: FigmaLocalVariableCollectionSchema,
+  formula: {
+    name: "FetchFigmaLocalVariableCollections",
+    description: "Fetches the variable collections from a Figma file along with their modes.",
+    parameters: [
+      coda.makeParameter({
+        type: coda.ParameterType.String,
+        name: "fileKey",
+        description: "The key of the Figma file.",
+      }),
+    ],
+    execute: async function ([fileKey], context) {
+      let url = `https://api.figma.com/v1/files/${fileKey}/variables/local`;
+
+      let response;
+      try {
+        response = await context.fetcher.fetch({
+          method: 'GET',
+          url: url,
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          let statusError = error as coda.StatusCodeError;
+          let message = statusError.body?.message;
+          if (message) {
+            throw new coda.UserVisibleError(message);
+          }
+        }
+        throw error;
+      }
+
+      // Extract the variable collections part of the response
+      const variableCollectionsObj = response.body.meta.variableCollections;
+
+      // Convert the variable collections object into an array of rows
+      const rows = Object.values(variableCollectionsObj);
+
+      return {
+        result: rows,
+      };
+    },
+  },
+});
+
+const FigmaPublishedVariableSchema = coda.makeObjectSchema({
+  properties: {
+    id: {
+      type: coda.ValueType.String,
+      description: "The unique identifier of the variable in the file where it is created.",
+    },
+    subscribed_id: {
+      type: coda.ValueType.String,
+      description: "The ID used by subscribing files, changes every time the variable is modified and published.",
+    },
+    name: {
+      type: coda.ValueType.String,
+      description: "The name of the variable.",
+    },
+    key: {
+      type: coda.ValueType.String,
+      description: "The key of the variable.",
+    },
+    variableCollectionId: {
+      type: coda.ValueType.String,
+      description: "The ID of the variable collection that contains this variable.",
+    },
+    resolvedType: {
+      type: coda.ValueType.String,
+      description: "The resolved type of the variable. Can be 'BOOLEAN', 'FLOAT', 'STRING', or 'COLOR'.",
+    },
+  },
+  idProperty: "id",
+  displayProperty: "name",
+  featuredProperties: ["name", "subscribed_id", "resolvedType"],
+});
+
+pack.addSyncTable({
+  name: "FigmaPublishedVariables",
+  description: "Get a list of all published variables from a Figma file. Note: Available only for Figma Enterprise plan.",
+  identityName: "FigmaPublishedVariable",
+  schema: FigmaPublishedVariableSchema,
+  formula: {
+    name: "FetchFigmaPublishedVariables",
+    description: "Fetches the published variables from a Figma file.",
+    parameters: [
+      coda.makeParameter({
+        type: coda.ParameterType.String,
+        name: "fileKey",
+        description: "The key of the Figma file.",
+      }),
+    ],
+    execute: async function ([fileKey], context) {
+      let url = `https://api.figma.com/v1/files/${fileKey}/variables/published`;
+
+      let response;
+      try {
+        response = await context.fetcher.fetch({
+          method: 'GET',
+          url: url,
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          let statusError = error as coda.StatusCodeError;
+          let message = statusError.body?.message;
+          if (message) {
+            throw new coda.UserVisibleError(message);
+          }
+        }
+        throw error;
+      }
+
+      // Extract the variables part of the response
+      const variablesObj = response.body.meta.variables;
+
+      // Convert the variables object into an array of rows
+      const rows = Object.values(variablesObj);
+
+      return {
+        result: rows,
+      };
+    },
+  },
+});
+
+const FigmaPublishedVariableCollectionSchema = coda.makeObjectSchema({
+  properties: {
+    id: {
+      type: coda.ValueType.String,
+      description: "The unique identifier of the variable collection in the file where it is created.",
+    },
+    subscribed_id: {
+      type: coda.ValueType.String,
+      description: "The ID used by subscribing files, changes every time the variable collection is modified and published.",
+    },
+    name: {
+      type: coda.ValueType.String,
+      description: "The name of the variable collection.",
+    },
+    key: {
+      type: coda.ValueType.String,
+      description: "The key of the variable collection.",
+    },
+  },
+  idProperty: "id",
+  displayProperty: "name",
+  featuredProperties: ["name", "subscribed_id"],
+});
+
+pack.addSyncTable({
+  name: "FigmaPublishedVariableCollections",
+  description: "Get a list of all published variable collections from a Figma file. Note: Available only for Figma Enterprise plan.",
+  identityName: "FigmaPublishedVariableCollection",
+  schema: FigmaPublishedVariableCollectionSchema,
+  formula: {
+    name: "FetchFigmaPublishedVariableCollections",
+    description: "Fetches the published variable collections from a Figma file.",
+    parameters: [
+      coda.makeParameter({
+        type: coda.ParameterType.String,
+        name: "fileKey",
+        description: "The key of the Figma file.",
+      }),
+    ],
+    execute: async function ([fileKey], context) {
+      let url = `https://api.figma.com/v1/files/${fileKey}/variables/published`;
+
+      let response;
+      try {
+        response = await context.fetcher.fetch({
+          method: 'GET',
+          url: url,
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          let statusError = error as coda.StatusCodeError;
+          let message = statusError.body?.message;
+          if (message) {
+            throw new coda.UserVisibleError(message);
+          }
+        }
+        throw error;
+      }
+
+      // Extract the variable collections part of the response
+      const variableCollectionsObj = response.body.meta.variableCollections;
+
+      // Convert the variable collections object into an array of rows
+      const rows = Object.values(variableCollectionsObj);
+
+      return {
+        result: rows,
+      };
+    },
+  },
+});
+
+
+// Define enum for resolved types
+// const ResolvedTypes = coda.makeEnum({
+//   type: coda.ValueType.String,
+//   name: 'ResolvedTypes',
+//   items: ['BOOLEAN', 'FLOAT', 'STRING', 'COLOR'],
+// });
+
+// // Define an action for creating a variable in an existing variable collection in Figma
+// pack.addFormula({
+//   name: "CreateVariableInCollection",
+//   description: "Create a new variable in an existing variable collection in Figma.",
+//   parameters: [
+//     coda.makeParameter({
+//       type: coda.ParameterType.String,
+//       name: "fileKey",
+//       description: "The file key for the Figma file.",
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.String,
+//       name: "variableName",
+//       description: "The name of the variable.",
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.String,
+//       name: "variableCollectionId",
+//       description: "The ID of the variable collection.",
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.String,
+//       name: "resolvedType",
+//       description: "The type of the variable.",
+//       codaType: ResolvedTypes,
+//     }),
+//   ],
+//   resultType: coda.ValueType.String,
+//   isAction: true,
+
+//   execute: async function ([fileKey, variableName, variableCollectionId, resolvedType], context) {
+//     // Construct the request body
+//     let requestBody = {
+//       variables: [
+//         {
+//           action: "CREATE",
+//           name: variableName,
+//           variableCollectionId: variableCollectionId,
+//           resolvedType: resolvedType
+//         }
+//       ]
+//     };
+
+//     // Make the API request to Figma
+//     let response = await context.fetcher.fetch({
+//       url: `https://api.figma.com/v1/files/${fileKey}/variables`,
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//       },
+//       body: JSON.stringify(requestBody),
+//     });
+
+//     // Return the response body
+//     return response.body;
+//   },
+// });
+
+const FigmaDevResourceSchema = coda.makeObjectSchema({
+  properties: {
+    id: {
+      type: coda.ValueType.String,
+      description: "The unique identifier of the dev resource.",
+    },
+    name: {
+      type: coda.ValueType.String,
+      description: "The name of the dev resource.",
+    },
+    url: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Url,
+      description: "The URL of the dev resource.",
+    },
+    node_id: {
+      type: coda.ValueType.String,
+      description: "The node ID associated with the dev resource in the Figma file.",
+    },
+    file_key: {
+      type: coda.ValueType.String,
+      description: "The file key associated with the dev resource in Figma.",
+    },
+    figma_url: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Url,
+      description: "The URL to the dev resource in Figma.",
+    },
+  },
+  idProperty: "id",
+  displayProperty: "name",
+  featuredProperties: ["name", "url", "figma_url"],
+});
+
+pack.addSyncTable({
+  name: "FigmaDevResources",
+  description: "Get a list of all dev resources in a Figma file.",
+  identityName: "FigmaDevResource",
+  schema: FigmaDevResourceSchema,
+  formula: {
+    name: "FetchFigmaDevResources",
+    description: "Fetches the dev resources from a Figma file.",
+    parameters: [
+      coda.makeParameter({
+        type: coda.ParameterType.String,
+        name: "fileKey",
+        description: "The key of the Figma file.",
+      }),
+    ],
+    execute: async function ([fileKey], context) {
+      let url = `https://api.figma.com/v1/files/${fileKey}/dev_resources`;
+
+      let response;
+      try {
+        response = await context.fetcher.fetch({
+          method: 'GET',
+          url: url,
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          let statusError = error as coda.StatusCodeError;
+          let message = statusError.body?.message;
+          if (message) {
+            throw new coda.UserVisibleError(message);
+          }
+        }
+        throw error;
+      }
+
+      // Extract the dev_resources part of the response
+      const devResources = response.body.dev_resources.map(resource => {
+        return {
+          ...resource,
+          figma_url: `https://www.figma.com/file/${resource.file_key}/?node-id=${resource.node_id}`,
+        };
+      });
+
+      return {
+        result: devResources,
+      };
+    },
+  },
+});
+
+
+pack.addFormula({
+  name: "CreateDevResource",
+  description: "Create a single dev resource in Figma.",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "name",
+      description: "The name of the dev resource.",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "url",
+      description: "The URL of the dev resource.",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "nodeId",
+      description: "The node ID associated with the dev resource in the Figma file.",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "fileKey",
+      description: "The file key associated with the dev resource in Figma.",
+    }),
+  ],
+  resultType: coda.ValueType.String,
+  isAction: true,
+  execute: async function ([name, url, nodeId, fileKey], context) {
+    const apiUrl = `https://api.figma.com/v1/dev_resources`;
+
+    let response;
+    try {
+      response = await context.fetcher.fetch({
+        method: 'POST',
+        url: apiUrl,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dev_resources: [
+            {
+              name: name,
+              url: url,
+              node_id: nodeId,
+              file_key: fileKey,
+            }
+          ]
+        }),
+      });
+
+      // Check if there are errors in the response body
+      if (response.body.errors && response.body.errors.length > 0) {
+        // Extract the first error message
+        const firstError = response.body.errors[0];
+        const errorMessage = firstError.error;
+
+        // Return the error message
+        return `Error creating dev resource: ${errorMessage}`;
+      }
+
+      // Return the created resources
+      return `Dev resource created successfully: ${JSON.stringify(response.body.links_created)}`;
+
+    } catch (error) {
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        let statusError = error as coda.StatusCodeError;
+        let message = statusError.body?.message;
+        if (message) {
+          return `Error: ${message}`;
+        }
+      }
+      throw error;
+    }
+  },
+});
+
+pack.addFormula({
+  name: "UpdateDevResource",
+  description: "Update a single dev resource in Figma.",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "id",
+      description: "The ID of the dev resource to update.",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "name",
+      description: "The updated name of the dev resource.",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "url",
+      description: "The updated URL of the dev resource.",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "nodeId",
+      description: "The updated node ID associated with the dev resource in the Figma file.",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "fileKey",
+      description: "The updated file key associated with the dev resource in Figma.",
+    }),
+  ],
+  resultType: coda.ValueType.String,
+  isAction: true,
+  execute: async function ([id, name, url, nodeId, fileKey], context) {
+    const apiUrl = `https://api.figma.com/v1/dev_resources`;
+
+    let response;
+    try {
+      response = await context.fetcher.fetch({
+        method: 'PUT',
+        url: apiUrl,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dev_resources: [
+            {
+              id: id,
+              name: name,
+              url: url,
+              node_id: nodeId,
+              file_key: fileKey,
+            }
+          ]
+        }),
+      });
+
+      // Check if there are errors in the response body
+      if (response.body.errors && response.body.errors.length > 0) {
+        // Extract the first error message
+        const firstError = response.body.errors[0];
+        const errorMessage = firstError.error;
+
+        // Return the error message
+        return `Error updating dev resource: ${errorMessage}`;
+      }
+
+      // Return the updated resources
+      return `Dev resource updated successfully: ${JSON.stringify(response.body.links_updated)}`;
+
+    } catch (error) {
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        let statusError = error as coda.StatusCodeError;
+        let message = statusError.body?.message;
+        if (message) {
+          return `Error: ${message}`;
+        }
+      }
+      throw error;
+    }
+  },
+});
+
+
+// pack.addFormula({
+//   name: "GetFigmaImage",
+//   description: "Fetches an image URL from a Figma file with customizable options.",
+//   parameters: [
+//     coda.makeParameter({
+//       type: coda.ParameterType.String,
+//       name: "fileKey",
+//       description: "The key of the Figma file.",
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.StringArray,
+//       name: "nodeIds",
+//       description: "The IDs of the nodes to retrieve images for, separated by commas.",
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.Number,
+//       name: "scale",
+//       description: "The image scaling factor between 0.01 and 4.",
+//       optional: true,
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.String,
+//       name: "format",
+//       description: "The image output format, can be jpg, png, svg, or pdf.",
+//       optional: true,
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.Boolean,
+//       name: "svgOutlineText",
+//       description: "Render text elements as outlines or as <text> elements in SVGs.",
+//       optional: true,
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.Boolean,
+//       name: "svgIncludeId",
+//       description: "Include id attributes for all SVG elements.",
+//       optional: true,
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.Boolean,
+//       name: "svgIncludeNodeId",
+//       description: "Include node id attributes for all SVG elements.",
+//       optional: true,
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.Boolean,
+//       name: "svgSimplifyStroke",
+//       description: "Simplify strokes and use stroke attribute if possible in SVGs.",
+//       optional: true,
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.Boolean,
+//       name: "contentsOnly",
+//       description: "Exclude content that overlaps the node from rendering.",
+//       optional: true,
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.Boolean,
+//       name: "useAbsoluteBounds",
+//       description: "Use the full dimensions of the node for the image.",
+//       optional: true,
+//     }),
+//     coda.makeParameter({
+//       type: coda.ParameterType.String,
+//       name: "version",
+//       description: "A specific version ID to use for the file.",
+//       optional: true,
+//     }),
+//   ],
+//   resultType: coda.ValueType.Object,
+//   schema: coda.makeObjectSchema({
+//     properties: {
+//       imageUrl: {
+//         type: coda.ValueType.String,
+//         codaType: coda.ValueHintType.ImageReference,
+//         description: "The URL of the image.",
+//       },
+//     },
+//     displayProperty: "imageUrl",
+//   }),
+//   execute: async function ([fileKey, nodeIds, scale, format, svgOutlineText, svgIncludeId, svgIncludeNodeId, svgSimplifyStroke, contentsOnly, useAbsoluteBounds, version], context) {
+//     // Manually construct the query string
+//     let queryParams = [];
+//     queryParams.push(`ids=${nodeIds.join(',')}`);
+//     if (format) queryParams.push(`format=${format}`);
+//     if (scale) queryParams.push(`scale=${scale}`);
+//     if (svgOutlineText) queryParams.push(`svgOutlineText=${svgOutlineText}`);
+//     if (svgIncludeId) queryParams.push(`svgIncludeId=${svgIncludeId}`);
+//     if (svgIncludeNodeId) queryParams.push(`svgIncludeNodeId=${svgIncludeNodeId}`);
+//     if (svgSimplifyStroke) queryParams.push(`svgSimplifyStroke=${svgSimplifyStroke}`);
+//     if (contentsOnly) queryParams.push(`contentsOnly=${contentsOnly}`);
+//     if (useAbsoluteBounds) queryParams.push(`useAbsoluteBounds=${useAbsoluteBounds}`);
+//     if (version) queryParams.push(`version=${version}`);
+    
+//     // Repeat for other parameters...
+
+//     const queryString = queryParams.join('&');
+//     const url = `https://api.figma.com/v1/images/${fileKey}?${queryString}`;
+
+//     let response = await context.fetcher.fetch({
+//       method: "GET",
+//       url: url,
+//     });
+
+//     // const firstNodeId = nodeIds[0];
+//     // const imageUrl = response.body.images[firstNodeId];
+//     const images = response.body.images;
+//     const imageUrl = nodeIds.map(id => images[id]).find(url => url !== undefined);
+
+
+//     if (!imageUrl) {
+//       throw new Error("Image URL not found for the provided node ID.");
+//     }
+
+//     return {
+//       imageUrl: imageUrl,
+//     };
+//   },
+// });
+
+pack.addFormula({
+  name: "GetFigmaImageFromLink",
+  description: "Fetches an image URL from a Figma frame link with customizable options.",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "frameLink",
+      description: "The link to the Figma frame.",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "format",
+      description: "The image output format, can be jpg, png, svg, or pdf.",
+      optional: true,
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.Number,
+      name: "scale",
+      description: "The image scaling factor between 0.01 and 4.",
+      optional: true,
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: coda.makeObjectSchema({
+    properties: {
+      imageUrl: {
+        type: coda.ValueType.String,
+        codaType: coda.ValueHintType.ImageReference,
+        description: "The URL of the image.",
+      },
+    },
+    displayProperty: "imageUrl",
+  }),
+  execute: async function ([frameLink, format = 'png', scale = 1], context) {
+    // Updated regex to flexibly capture file key and node ID
+    const linkPattern = /figma.com\/file\/([^\/?]+).*?node-id=([^&]+)/;
+    const match = frameLink.match(linkPattern);
+    
+    if (!match) {
+      console.error("Failed to match the Figma link. Please check the format.");
+      throw new Error("Invalid Figma frame link.");
+    }
+
+    const fileKey = match[1];
+    let nodeId = match[2].replace('-', ':');
+
+    let queryParams = `ids=${nodeId}&format=${format}&scale=${scale}`;
+    
+    const url = `https://api.figma.com/v1/images/${fileKey}?${queryParams}`;
+
+    let response = await context.fetcher.fetch({
+      method: "GET",
+      url: url,
+    });
+
+    const data = response.body;
+    const imageUrl = data.images[nodeId];
+
+    if (!imageUrl) {
+      console.error("No image URL found for the node ID:", nodeId);
+      throw new Error("Image URL not found for the provided frame link.");
+    }
+
+    return {
+      imageUrl: imageUrl,
+    };
+  },
+});
