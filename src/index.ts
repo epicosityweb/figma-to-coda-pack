@@ -228,6 +228,22 @@ const ComponentsSchema = coda.makeObjectSchema({
       codaType: coda.ValueHintType.Url,
       description: "Direct link to the component in Figma",
     },
+    dev_resources: {
+      type: coda.ValueType.Array,
+      items: coda.makeObjectSchema({
+        type: coda.ValueType.Object,
+        codaType: coda.ValueHintType.Reference,
+        description: "Reference to a dev resource",
+        properties: {
+          id: { type: coda.ValueType.String, required: true },
+          name: { type: coda.ValueType.String, required: true },
+        },
+        identity: { name: "DevResource" },
+        displayProperty: "name",
+        idProperty: "id",
+      }),
+      description: "Dev resources linked to this component",
+    },
   },
   idProperty: "key",
   displayProperty: "name",
@@ -399,6 +415,22 @@ const ComponentSetsSchema = coda.makeObjectSchema({
       type: coda.ValueType.String,
       codaType: coda.ValueHintType.Url,
       description: "Direct link to the component set in Figma",
+    },
+    dev_resources: {
+      type: coda.ValueType.Array,
+      items: coda.makeObjectSchema({
+        type: coda.ValueType.Object,
+        codaType: coda.ValueHintType.Reference,
+        description: "Reference to a dev resource",
+        properties: {
+          id: { type: coda.ValueType.String, required: true },
+          name: { type: coda.ValueType.String, required: true },
+        },
+        identity: { name: "DevResource" },
+        displayProperty: "name",
+        idProperty: "id",
+      }),
+      description: "Dev resources linked to this component set",
     },
   },
   idProperty: "key",
@@ -637,6 +669,30 @@ pack.addSyncTable({
       const components = response.body.meta?.components || [];
       const cursor = response.body.meta?.cursor;
 
+      // Fetch dev resources for this file to create relationships
+      let devResourcesResponse;
+      let devResourcesMap = new Map();
+      try {
+        devResourcesResponse = await context.fetcher.fetch({
+          method: "GET",
+          url: `https://api.figma.com/v1/files/${fileKey}/dev_resources`,
+        });
+        const devResources = devResourcesResponse.body.dev_resources || [];
+        // Create a map of node_id -> dev_resources[]
+        for (const resource of devResources) {
+          if (!devResourcesMap.has(resource.node_id)) {
+            devResourcesMap.set(resource.node_id, []);
+          }
+          devResourcesMap.get(resource.node_id).push({
+            id: resource.id,
+            name: resource.name,
+          });
+        }
+      } catch (error) {
+        // Dev resources might not be accessible or supported, continue without them
+        console.log("Could not fetch dev resources:", error.message);
+      }
+
       // Transform API response to match our schema
       const rows = components.map((c: any) => ({
         key: c.key,
@@ -657,6 +713,7 @@ pack.addSyncTable({
           pageName: c.containing_frame?.pageName || "",
         },
         link: `https://www.figma.com/file/${c.file_key}/?node-id=${encodeURIComponent(c.node_id)}`,
+        dev_resources: devResourcesMap.get(c.node_id) || [],
       }));
 
       return {
@@ -795,6 +852,30 @@ pack.addSyncTable({
       const componentSets = response.body.meta?.component_sets || [];
       const cursor = response.body.meta?.cursor;
 
+      // Fetch dev resources for this file to create relationships
+      let devResourcesResponse;
+      let devResourcesMap = new Map();
+      try {
+        devResourcesResponse = await context.fetcher.fetch({
+          method: "GET",
+          url: `https://api.figma.com/v1/files/${fileKey}/dev_resources`,
+        });
+        const devResources = devResourcesResponse.body.dev_resources || [];
+        // Create a map of node_id -> dev_resources[]
+        for (const resource of devResources) {
+          if (!devResourcesMap.has(resource.node_id)) {
+            devResourcesMap.set(resource.node_id, []);
+          }
+          devResourcesMap.get(resource.node_id).push({
+            id: resource.id,
+            name: resource.name,
+          });
+        }
+      } catch (error) {
+        // Dev resources might not be accessible or supported, continue without them
+        console.log("Could not fetch dev resources:", error.message);
+      }
+
       // Transform API response to match our schema
       const rows = componentSets.map((cs: any) => ({
         key: cs.key,
@@ -818,6 +899,7 @@ pack.addSyncTable({
           backgroundColor: cs.containing_frame?.backgroundColor || "",
         },
         link: `https://www.figma.com/file/${cs.file_key}/?node-id=${encodeURIComponent(cs.node_id)}`,
+        dev_resources: devResourcesMap.get(cs.node_id) || [],
       }));
 
       return {
@@ -1256,6 +1338,32 @@ const DevResourcesSchema = coda.makeObjectSchema({
       codaType: coda.ValueHintType.Url,
       description: "Direct link to the node in Figma",
     },
+    component: {
+      type: coda.ValueType.Object,
+      codaType: coda.ValueHintType.Reference,
+      description: "Reference to the component this dev resource is attached to",
+      properties: {
+        key: { type: coda.ValueType.String, required: true },
+        name: { type: coda.ValueType.String, required: true },
+      },
+      identity: { name: "FileComponent" },
+      displayProperty: "name",
+      idProperty: "key",
+      optional: true,
+    },
+    component_set: {
+      type: coda.ValueType.Object,
+      codaType: coda.ValueHintType.Reference,
+      description: "Reference to the component set this dev resource is attached to",
+      properties: {
+        key: { type: coda.ValueType.String, required: true },
+        name: { type: coda.ValueType.String, required: true },
+      },
+      identity: { name: "FileComponentSet" },
+      displayProperty: "name",
+      idProperty: "key",
+      optional: true,
+    },
   },
   displayProperty: "name",
   idProperty: "id",
@@ -1311,6 +1419,40 @@ pack.addSyncTable({
 
       const devResources = response.body.dev_resources || [];
 
+      // Fetch components and component sets to create reverse references
+      let componentsMap = new Map();
+      let componentSetsMap = new Map();
+      try {
+        // Fetch components
+        const componentsResponse = await context.fetcher.fetch({
+          method: "GET",
+          url: `https://api.figma.com/v1/files/${fileKey}/components`,
+        });
+        const components = componentsResponse.body.meta?.components || [];
+        for (const component of components) {
+          componentsMap.set(component.node_id, {
+            key: component.key,
+            name: component.name,
+          });
+        }
+
+        // Fetch component sets
+        const componentSetsResponse = await context.fetcher.fetch({
+          method: "GET",
+          url: `https://api.figma.com/v1/files/${fileKey}/component_sets`,
+        });
+        const componentSets = componentSetsResponse.body.meta?.component_sets || [];
+        for (const componentSet of componentSets) {
+          componentSetsMap.set(componentSet.node_id, {
+            key: componentSet.key,
+            name: componentSet.name,
+          });
+        }
+      } catch (error) {
+        // Components might not be accessible, continue without them
+        console.log("Could not fetch components for references:", error.message);
+      }
+
       // Add timestamps (using current time as API doesn't provide these)
       const now = new Date().toISOString();
 
@@ -1324,6 +1466,8 @@ pack.addSyncTable({
           created_at: now, // API doesn't provide creation time
           updated_at: now, // API doesn't provide update time
           link: `https://www.figma.com/file/${resource.file_key}?node-id=${encodeURIComponent(resource.node_id)}`,
+          component: componentsMap.get(resource.node_id) || undefined,
+          component_set: componentSetsMap.get(resource.node_id) || undefined,
         })),
       };
     },
