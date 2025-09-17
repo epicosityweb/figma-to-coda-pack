@@ -1,5 +1,47 @@
 # Technical & Product Decisions Log
 
+## Session 9 Decisions (2025-09-17) - Security Focus
+
+### Decision 19: Environment Variable Management for Local Development
+**Context**: Need secure way to manage OAuth credentials after exposure incident
+**Decision**: Implement `.env` file system with `.env.example` template
+**Rationale**:
+- Industry standard practice for credential management
+- Keeps secrets out of version control while maintaining development access
+- Clear documentation via example file without exposing actual values
+- Supports both local development and production deployment patterns
+**Impact**: Enhanced security with maintained development productivity
+
+### Decision 20: Temporary Credential Retention Strategy
+**Context**: OAuth credentials exposed in Git history, user wants to continue development
+**Decision**: Retain current credentials temporarily due to private repository status
+**Rationale**:
+- Private repository significantly reduces immediate exposure risk
+- Active development phase benefits from workflow continuity
+- Can monitor for unauthorized access while planning rotation
+- User preference to complete current development before credential changes
+**Impact**: Balanced approach between security and development velocity
+
+### Decision 21: GitHub Issue Tracking for Security Follow-up
+**Context**: Need systematic approach to ensure credential rotation isn't forgotten
+**Decision**: Create GitHub issue with partially redacted credentials for tracking
+**Rationale**:
+- Provides auditable trail of security incident and remediation
+- Ensures accountability and follow-through on security tasks
+- Partial redaction maintains context while limiting additional exposure
+- Integrates with existing project management workflow
+**Impact**: Organized security incident management with clear action items
+
+### Decision 22: Private Repository Strategy for Risk Mitigation
+**Context**: OAuth credentials exposed in Git commit history
+**Decision**: Maintain private repository status as primary risk mitigation
+**Rationale**:
+- Dramatically reduces exposure surface to authorized collaborators only
+- Provides immediate security improvement without workflow disruption
+- Allows time for planned credential rotation rather than emergency response
+- Standard practice for projects containing sensitive configuration
+**Impact**: Immediate risk reduction while maintaining development flexibility
+
 ## Session 8 Decisions (2025-09-17)
 
 ### Decision 16: Projects API Integration Approach

@@ -11,7 +11,7 @@ pack.setUserAuthentication({
   type: coda.AuthenticationType.OAuth2,
   authorizationUrl: "https://www.figma.com/oauth",
   tokenUrl: "https://api.figma.com/v1/oauth/token",
-  scopes: ["file_read", "projects:read"],
+  scopes: ["file_read", "projects:read", "file_dev_resources:read", "file_dev_resources:write"],
 
   // Get connection name to display in Coda
   getConnectionName: async function (context) {
@@ -1213,6 +1213,483 @@ pack.addFormula({
       user: componentSet.user,
       containing_frame: componentSet.containing_frame,
       link: `https://www.figma.com/file/${componentSet.file_key}?node-id=${encodeURIComponent(componentSet.node_id)}`,
+    };
+  },
+});
+
+// DevResourcesSchema - Schema for dev resources
+const DevResourcesSchema = coda.makeObjectSchema({
+  properties: {
+    id: {
+      type: coda.ValueType.String,
+      description: "Unique identifier of the dev resource",
+    },
+    name: {
+      type: coda.ValueType.String,
+      description: "The name of the dev resource",
+    },
+    url: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Url,
+      description: "The URL of the dev resource",
+    },
+    file_key: {
+      type: coda.ValueType.String,
+      description: "The file key where the dev resource belongs",
+    },
+    node_id: {
+      type: coda.ValueType.String,
+      description: "The target node to attach the dev resource to",
+    },
+    created_at: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.DateTime,
+      description: "When the dev resource was created",
+    },
+    updated_at: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.DateTime,
+      description: "When the dev resource was last updated",
+    },
+    link: {
+      type: coda.ValueType.String,
+      codaType: coda.ValueHintType.Url,
+      description: "Direct link to the node in Figma",
+    },
+  },
+  displayProperty: "name",
+  idProperty: "id",
+  featuredProperties: ["name", "url", "node_id", "updated_at"],
+});
+
+// FigmaDevResources sync table - Sync all dev resources from a file
+pack.addSyncTable({
+  name: "FigmaDevResources",
+  description: "Sync all dev resources from a Figma file",
+  identityName: "DevResource",
+  schema: DevResourcesSchema,
+  formula: {
+    name: "SyncDevResources",
+    description: "Sync dev resources from a Figma file",
+    parameters: [
+      coda.makeParameter({
+        type: coda.ParameterType.String,
+        name: "fileUrl",
+        description: "URL of the Figma file (e.g., https://www.figma.com/file/ABC123/...)",
+      }),
+      coda.makeParameter({
+        type: coda.ParameterType.String,
+        name: "nodeIds",
+        description: "Optional comma-separated list of node IDs to filter resources",
+        optional: true,
+      }),
+    ],
+    execute: async function ([fileUrl, nodeIds], context) {
+      // Extract file key from URL
+      const fileKeyMatch = fileUrl.match(/\/(?:file|design)\/([a-zA-Z0-9]+)/);
+      if (!fileKeyMatch) {
+        throw new coda.UserVisibleError("Invalid file URL format. Please provide a valid Figma file URL.");
+      }
+
+      const fileKey = fileKeyMatch[1];
+      const queryParams = nodeIds ? `?node_ids=${nodeIds}` : '';
+
+      let response;
+      try {
+        response = await context.fetcher.fetch({
+          method: "GET",
+          url: `https://api.figma.com/v1/files/${fileKey}/dev_resources${queryParams}`,
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          const statusError = error as coda.StatusCodeError;
+          const message = statusError.body?.message || statusError.message;
+          throw new coda.UserVisibleError(`Failed to fetch dev resources: ${message}`);
+        }
+        throw error;
+      }
+
+      const devResources = response.body.dev_resources || [];
+
+      // Add timestamps (using current time as API doesn't provide these)
+      const now = new Date().toISOString();
+
+      return {
+        result: devResources.map((resource: any) => ({
+          id: resource.id,
+          name: resource.name,
+          url: resource.url,
+          file_key: resource.file_key,
+          node_id: resource.node_id,
+          created_at: now, // API doesn't provide creation time
+          updated_at: now, // API doesn't provide update time
+          link: `https://www.figma.com/file/${resource.file_key}?node-id=${encodeURIComponent(resource.node_id)}`,
+        })),
+      };
+    },
+  },
+});
+
+// CreateDevResource action formula
+pack.addFormula({
+  name: "CreateDevResource",
+  description: "Create a new dev resource and link it to a Figma node",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "fileKey",
+      description: "The file key where the dev resource will be created",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "nodeId",
+      description: "The target node ID to attach the dev resource to",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "name",
+      description: "The name of the dev resource",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "url",
+      description: "The URL of the dev resource (e.g., Jira ticket, GitHub PR, documentation)",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: DevResourcesSchema,
+  isAction: true,
+  execute: async function ([fileKey, nodeId, name, url], context) {
+    let response;
+    try {
+      response = await context.fetcher.fetch({
+        method: "POST",
+        url: "https://api.figma.com/v1/dev_resources",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dev_resources: [
+            {
+              file_key: fileKey,
+              node_id: nodeId,
+              name: name,
+              url: url,
+            },
+          ],
+        }),
+      });
+    } catch (error) {
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        const statusError = error as coda.StatusCodeError;
+        const message = statusError.body?.message || statusError.message;
+        throw new coda.UserVisibleError(`Failed to create dev resource: ${message}`);
+      }
+      throw error;
+    }
+
+    // Check for errors in the response
+    if (response.body.errors && response.body.errors.length > 0) {
+      const errorMsg = response.body.errors[0].error;
+      throw new coda.UserVisibleError(`Failed to create dev resource: ${errorMsg}`);
+    }
+
+    // Return the created resource
+    const created = response.body.links_created?.[0];
+    if (!created) {
+      throw new coda.UserVisibleError("Dev resource creation failed - no resource returned");
+    }
+
+    const now = new Date().toISOString();
+    return {
+      id: created.id,
+      name: created.name,
+      url: created.url,
+      file_key: created.file_key,
+      node_id: created.node_id,
+      created_at: now,
+      updated_at: now,
+      link: `https://www.figma.com/file/${created.file_key}?node-id=${encodeURIComponent(created.node_id)}`,
+    };
+  },
+});
+
+// UpdateDevResource action formula
+pack.addFormula({
+  name: "UpdateDevResource",
+  description: "Update an existing dev resource",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "resourceId",
+      description: "The ID of the dev resource to update",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "name",
+      description: "The new name for the dev resource",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "url",
+      description: "The new URL for the dev resource",
+    }),
+  ],
+  resultType: coda.ValueType.String,
+  isAction: true,
+  execute: async function ([resourceId, name, url], context) {
+    let response;
+    try {
+      response = await context.fetcher.fetch({
+        method: "PUT",
+        url: "https://api.figma.com/v1/dev_resources",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dev_resources: [
+            {
+              id: resourceId,
+              name: name,
+              url: url,
+            },
+          ],
+        }),
+      });
+    } catch (error) {
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        const statusError = error as coda.StatusCodeError;
+        const message = statusError.body?.message || statusError.message;
+        throw new coda.UserVisibleError(`Failed to update dev resource: ${message}`);
+      }
+      throw error;
+    }
+
+    // Check for errors in the response
+    if (response.body.errors && response.body.errors.length > 0) {
+      const errorMsg = response.body.errors[0].error;
+      throw new coda.UserVisibleError(`Failed to update dev resource: ${errorMsg}`);
+    }
+
+    // Return success message
+    const updated = response.body.links_updated?.[0];
+    if (!updated) {
+      throw new coda.UserVisibleError("Dev resource update failed - no confirmation returned");
+    }
+
+    return `Successfully updated dev resource: ${resourceId}`;
+  },
+});
+
+// DeleteDevResource action formula
+pack.addFormula({
+  name: "DeleteDevResource",
+  description: "Delete a dev resource from a Figma file",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "fileKey",
+      description: "The file key containing the dev resource",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "resourceId",
+      description: "The ID of the dev resource to delete",
+    }),
+  ],
+  resultType: coda.ValueType.String,
+  isAction: true,
+  execute: async function ([fileKey, resourceId], context) {
+    try {
+      await context.fetcher.fetch({
+        method: "DELETE",
+        url: `https://api.figma.com/v1/files/${fileKey}/dev_resources/${resourceId}`,
+      });
+    } catch (error) {
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        const statusError = error as coda.StatusCodeError;
+        const message = statusError.body?.message || statusError.message;
+        throw new coda.UserVisibleError(`Failed to delete dev resource: ${message}`);
+      }
+      throw error;
+    }
+
+    return `Successfully deleted dev resource: ${resourceId}`;
+  },
+});
+
+// BulkCreateDevResources action formula
+pack.addFormula({
+  name: "BulkCreateDevResources",
+  description: "Create multiple dev resources at once",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.StringArray,
+      name: "fileKeys",
+      description: "Array of file keys where resources will be created",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.StringArray,
+      name: "nodeIds",
+      description: "Array of node IDs to attach resources to",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.StringArray,
+      name: "names",
+      description: "Array of names for the dev resources",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.StringArray,
+      name: "urls",
+      description: "Array of URLs for the dev resources",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: coda.makeObjectSchema({
+    properties: {
+      created: {
+        type: coda.ValueType.Number,
+        description: "Number of resources successfully created",
+      },
+      errors: {
+        type: coda.ValueType.Number,
+        description: "Number of resources that failed to create",
+      },
+      details: {
+        type: coda.ValueType.String,
+        description: "Details about the operation",
+      },
+    },
+    displayProperty: "details",
+  }),
+  isAction: true,
+  execute: async function ([fileKeys, nodeIds, names, urls], context) {
+    // Validate arrays have same length
+    if (fileKeys.length !== nodeIds.length || fileKeys.length !== names.length || fileKeys.length !== urls.length) {
+      throw new coda.UserVisibleError("All arrays must have the same length");
+    }
+
+    // Build dev resources array
+    const devResources = fileKeys.map((fileKey, i) => ({
+      file_key: fileKey,
+      node_id: nodeIds[i],
+      name: names[i],
+      url: urls[i],
+    }));
+
+    let response;
+    try {
+      response = await context.fetcher.fetch({
+        method: "POST",
+        url: "https://api.figma.com/v1/dev_resources",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dev_resources: devResources,
+        }),
+      });
+    } catch (error) {
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        const statusError = error as coda.StatusCodeError;
+        const message = statusError.body?.message || statusError.message;
+        throw new coda.UserVisibleError(`Failed to create dev resources: ${message}`);
+      }
+      throw error;
+    }
+
+    const created = response.body.links_created?.length || 0;
+    const errors = response.body.errors?.length || 0;
+
+    return {
+      created: created,
+      errors: errors,
+      details: `Created ${created} resources, ${errors} errors`,
+    };
+  },
+});
+
+// BulkUpdateDevResources action formula
+pack.addFormula({
+  name: "BulkUpdateDevResources",
+  description: "Update multiple dev resources at once",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.StringArray,
+      name: "resourceIds",
+      description: "Array of resource IDs to update",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.StringArray,
+      name: "names",
+      description: "Array of new names for the resources",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.StringArray,
+      name: "urls",
+      description: "Array of new URLs for the resources",
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: coda.makeObjectSchema({
+    properties: {
+      updated: {
+        type: coda.ValueType.Number,
+        description: "Number of resources successfully updated",
+      },
+      errors: {
+        type: coda.ValueType.Number,
+        description: "Number of resources that failed to update",
+      },
+      details: {
+        type: coda.ValueType.String,
+        description: "Details about the operation",
+      },
+    },
+    displayProperty: "details",
+  }),
+  isAction: true,
+  execute: async function ([resourceIds, names, urls], context) {
+    // Validate arrays have same length
+    if (resourceIds.length !== names.length || resourceIds.length !== urls.length) {
+      throw new coda.UserVisibleError("All arrays must have the same length");
+    }
+
+    // Build dev resources array
+    const devResources = resourceIds.map((id, i) => ({
+      id: id,
+      name: names[i],
+      url: urls[i],
+    }));
+
+    let response;
+    try {
+      response = await context.fetcher.fetch({
+        method: "PUT",
+        url: "https://api.figma.com/v1/dev_resources",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dev_resources: devResources,
+        }),
+      });
+    } catch (error) {
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        const statusError = error as coda.StatusCodeError;
+        const message = statusError.body?.message || statusError.message;
+        throw new coda.UserVisibleError(`Failed to update dev resources: ${message}`);
+      }
+      throw error;
+    }
+
+    const updated = response.body.links_updated?.length || 0;
+    const errors = response.body.errors?.length || 0;
+
+    return {
+      updated: updated,
+      errors: errors,
+      details: `Updated ${updated} resources, ${errors} errors`,
     };
   },
 });

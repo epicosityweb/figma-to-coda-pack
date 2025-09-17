@@ -26,26 +26,30 @@ This is a **session-based development project** with structured AI conversation 
 - **`src/index.ts`** - Single-file MVP pack implementation (will expand to modular structure)
 
 ### Current Development Phase
-**Phase 3: Complete Feature Set (100% complete)**
-- OAuth2 authentication fully working and deployed (Pack ID: 44800, Version 10)
-- Six production sync tables: TeamProjects, ProjectFiles, TeamComponents, FileComponents, FileStyles, FileComponentSets
+**Phase 3.5: Dev Resources Integration (100% complete)**
+- OAuth2 authentication fully working and deployed (Pack ID: 44800, Version 11)
+- Seven production sync tables: TeamProjects, ProjectFiles, TeamComponents, FileComponents, FileStyles, FileComponentSets, FigmaDevResources
 - Three card formulas: ComponentCard, StyleCard, ComponentSetCard
-- Comprehensive schemas for organizational structure and design assets
+- Six dev resources action formulas: CreateDevResource, UpdateDevResource, DeleteDevResource, BulkCreateDevResources, BulkUpdateDevResources
+- Bi-directional linking between Figma Dev Mode and Coda tracking rows
+- Comprehensive schemas for organizational structure, design assets, and dev resources
 - Test formulas: `TestConnection()` and `TestTeamAccess()`
 - Projects API integration with `projects:read` scope
+- Dev Resources API integration with `file_dev_resources:read` and `file_dev_resources:write` scopes
 - Pagination support for large datasets
 - Flexible URL parsing for both /file/ and /design/ formats
 - Rich card displays with thumbnails, metadata, and direct Figma links
+- Production tracking workflow enabling seamless component implementation status management
 
 ### Current Architecture
-**Single-file implementation** in `src/index.ts` (~1200 lines):
+**Single-file implementation** in `src/index.ts` (~1700 lines):
 - All schemas, sync tables, and formulas in one file
 - Proven to work well for current feature set
 - May evolve to modular structure in future phases
 
 ### Key Figma API Integration Points
 - **OAuth Endpoints**: Authorization at `https://www.figma.com/oauth`, token at `https://api.figma.com/v1/oauth/token`
-- **OAuth Scopes**: `file_read`, `projects:read` ✅ Configured
+- **OAuth Scopes**: `file_read`, `projects:read`, `file_dev_resources:read`, `file_dev_resources:write` ✅ Configured
 - **User Info**: `/v1/me` endpoint for connection names ✅ Implemented
 
 #### Organizational Structure (⚠️ Requires API Approval)
@@ -57,6 +61,12 @@ This is a **session-based development project** with structured AI conversation 
 - **File Components**: `/v1/files/{file_key}/components` (with pagination) ✅ Implemented
 - **File Styles**: `/v1/files/{file_key}/styles` (with pagination) ✅ Implemented
 - **File Component Sets**: `/v1/files/{file_key}/component_sets` (with pagination) ✅ Implemented
+
+#### Dev Resources (✅ Implemented)
+- **Get Dev Resources**: `/v1/files/{file_key}/dev_resources` ✅ Implemented
+- **Create Dev Resources**: `POST /v1/dev_resources` ✅ Implemented
+- **Update Dev Resources**: `PUT /v1/dev_resources` ✅ Implemented
+- **Delete Dev Resources**: `DELETE /v1/files/{file_key}/dev_resources/{id}` ✅ Implemented
 
 #### Enterprise Features (Planned)
 - **Variables**: `/v1/files/{file_key}/variables/local` (Enterprise only) ⏳ Planned
@@ -151,6 +161,9 @@ try {
 - **FileStyles** - Sync all styles (text, color, effects, grids) from a file
 - **FileComponentSets** - Sync all component sets (variant groups) from a file
 
+#### Dev Resources (✅ New in Version 11)
+- **FigmaDevResources** - Sync all dev resources from a Figma file for production tracking
+
 ### Schemas Implemented
 #### Organizational
 - **ProjectsSchema** - Project data with team ID, file count, timestamps
@@ -160,6 +173,19 @@ try {
 - **ComponentsSchema** - Full component data with thumbnails, user info, containing frames
 - **StylesSchema** - Style data with type, thumbnails, sort position
 - **ComponentSetsSchema** - Component set data with variant information
+
+#### Dev Resources (✅ New in Version 11)
+- **DevResourcesSchema** - Dev resource data with id, name, url, file_key, node_id, links
+
+### Dev Resources Action Formulas (✅ New in Version 11)
+#### Individual Operations
+- **CreateDevResource** - Create a new dev resource link to a Figma node
+- **UpdateDevResource** - Update existing dev resource name and URL
+- **DeleteDevResource** - Remove a dev resource from a Figma file
+
+#### Bulk Operations
+- **BulkCreateDevResources** - Create multiple dev resources efficiently
+- **BulkUpdateDevResources** - Update multiple dev resources at once
 
 ## Reference Implementation
 The `Figma Design Integration - Source Code` file contains a complete implementation with all planned features. Use this as reference for:
@@ -171,12 +197,15 @@ The `Figma Design Integration - Source Code` file contains a complete implementa
 ## Deployment Status
 **Pack is fully deployed and working:**
 - ✅ OAuth application registered with Figma
-- ✅ Pack uploaded to Coda (Pack ID: 44800, Version 10)
+- ✅ Pack uploaded to Coda (Pack ID: 44800, Version 11)
 - ✅ OAuth credentials configured in both Figma and Coda
 - ✅ All design asset sync tables tested with real data
 - ✅ All card formulas implemented and deployed
 - ✅ Pagination working for large datasets
 - ✅ Rich card displays with thumbnails and metadata
+- ✅ **Dev Resources Integration Complete**: FigmaDevResources sync table and 6 action formulas
+- ✅ **Bi-directional Linking**: Seamless connection between Figma Dev Mode and Coda tracking
+- ✅ **Production Workflow**: Full create, read, update, delete operations for dev resources
 - 🚫 **Projects API BLOCKED**: Requires approval from Figma (submitted 2025-09-17)
 - ⏳ TeamProjects and ProjectFiles sync tables await API approval
 
@@ -185,3 +214,4 @@ The pack supports both current Figma URL formats:
 - **Legacy**: `https://www.figma.com/file/ABC123/filename`
 - **Current**: `https://www.figma.com/design/ABC123/filename`
 - **Team URLs**: `https://www.figma.com/files/team/123456789`
+- make sure to deploy the security audit guardian sub agent when you're updating documentation or about to push updates to github
