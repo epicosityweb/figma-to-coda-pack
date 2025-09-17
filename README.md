@@ -38,17 +38,27 @@ This pack has completed Phase 3 development with full sync table and card formul
    npm install
    ```
 
-2. **Build the pack:**
+2. **Configure environment variables:**
+   ```bash
+   # Copy the example environment file
+   cp .env.example .env
+
+   # Edit .env with your actual Figma OAuth credentials
+   # Note: These are for local development only
+   # Production OAuth is configured in Coda Pack settings
+   ```
+
+3. **Build the pack:**
    ```bash
    npm run build
    ```
 
-3. **Validate the pack:**
+4. **Validate the pack:**
    ```bash
    npm run validate
    ```
 
-4. **Test locally:**
+5. **Test locally:**
    ```bash
    npm run test
    ```
@@ -81,6 +91,14 @@ Use `TestTeamAccess("YOUR_TEAM_URL")` to verify API access:
 - Returns team ID and component count
 - Validates API permissions
 
+## Security Notes
+
+⚠️ **OAuth Credentials**: Never commit OAuth credentials to version control
+- Use `.env` files for local development (already gitignored)
+- Production credentials are managed in Coda Pack settings
+- See [Issue #1](https://github.com/epicosityweb/figma-to-coda-pack/issues/1) for credential rotation tracking
+- If credentials are exposed, rotate them immediately via Figma Developer Portal
+
 ## Project Structure
 
 ```
@@ -93,6 +111,8 @@ figma-coda-pack/
 │   └── decisions-log.md
 ├── src/                   # Source code
 │   └── index.ts          # Main pack implementation
+├── .env.example          # Environment variable template
+├── .env                  # Local OAuth credentials (gitignored)
 ├── package.json          # Node.js dependencies and scripts
 ├── tsconfig.json         # TypeScript configuration
 └── README.md             # This file
