@@ -26,17 +26,19 @@ This is a **session-based development project** with structured AI conversation 
 - **`src/index.ts`** - Single-file MVP pack implementation (will expand to modular structure)
 
 ### Current Development Phase
-**Phase 3: Complete Feature Set (90% complete)**
-- OAuth2 authentication fully working and deployed (Pack ID: 44800)
+**Phase 3: Complete Feature Set (100% complete)**
+- OAuth2 authentication fully working and deployed (Pack ID: 44800, Version 10)
 - Six production sync tables: TeamProjects, ProjectFiles, TeamComponents, FileComponents, FileStyles, FileComponentSets
+- Three card formulas: ComponentCard, StyleCard, ComponentSetCard
 - Comprehensive schemas for organizational structure and design assets
 - Test formulas: `TestConnection()` and `TestTeamAccess()`
 - Projects API integration with `projects:read` scope
 - Pagination support for large datasets
 - Flexible URL parsing for both /file/ and /design/ formats
+- Rich card displays with thumbnails, metadata, and direct Figma links
 
 ### Current Architecture
-**Single-file implementation** in `src/index.ts` (732 lines):
+**Single-file implementation** in `src/index.ts` (~1200 lines):
 - All schemas, sync tables, and formulas in one file
 - Proven to work well for current feature set
 - May evolve to modular structure in future phases
@@ -78,6 +80,35 @@ This is a **session-based development project** with structured AI conversation 
 2. Update `progress-tracker.md` with current completion status
 3. Add any architectural decisions to `decisions-log.md`
 4. Set clear next session priorities
+
+## Coda Pack Documentation & Resources
+
+### Official Documentation
+- **Main Documentation**: https://coda.io/packs/build/latest/
+- **API Reference**: https://coda.io/packs/build/latest/reference/sdk/
+- **Community & Support**: https://community.coda.io/
+
+### Local SDK Reference (Downloaded)
+The `packs-sdk/` directory contains a complete copy of the @codahq/packs-sdk for offline reference:
+- **`packs-sdk/dist/`** - TypeScript definitions for all SDK classes, methods, and types
+- **`packs-sdk/documentation/samples/`** - Example packs demonstrating various features
+- **`packs-sdk/README.md`** - SDK overview and getting started guide
+
+### Key Documentation Sections
+- **Formulas**: https://coda.io/packs/build/latest/guides/blocks/formulas/
+- **Sync Tables**: https://coda.io/packs/build/latest/guides/blocks/sync-tables/
+- **Cards**: https://coda.io/packs/build/latest/guides/blocks/cards/
+- **Actions**: https://coda.io/packs/build/latest/guides/blocks/actions/
+- **Authentication**: https://coda.io/packs/build/latest/guides/basics/authentication/
+- **Error Handling**: https://coda.io/packs/build/latest/guides/advanced/errors/
+- **Testing**: https://coda.io/packs/build/latest/guides/development/testing/
+
+### Local Development References
+When implementing features, consult these local files:
+- **Schema Types**: `packs-sdk/dist/schema.d.ts`
+- **Pack Building**: `packs-sdk/dist/builder.d.ts`
+- **Authentication Types**: `packs-sdk/dist/types.d.ts`
+- **Sample Implementations**: `packs-sdk/documentation/samples/packs/`
 
 ## Coda Pack Development Specifics
 
@@ -140,10 +171,12 @@ The `Figma Design Integration - Source Code` file contains a complete implementa
 ## Deployment Status
 **Pack is fully deployed and working:**
 - ✅ OAuth application registered with Figma
-- ✅ Pack uploaded to Coda (Pack ID: 44800, Version 9)
+- ✅ Pack uploaded to Coda (Pack ID: 44800, Version 10)
 - ✅ OAuth credentials configured in both Figma and Coda
 - ✅ All design asset sync tables tested with real data
+- ✅ All card formulas implemented and deployed
 - ✅ Pagination working for large datasets
+- ✅ Rich card displays with thumbnails and metadata
 - 🚫 **Projects API BLOCKED**: Requires approval from Figma (submitted 2025-09-17)
 - ⏳ TeamProjects and ProjectFiles sync tables await API approval
 

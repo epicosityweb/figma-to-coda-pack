@@ -74,7 +74,7 @@
 - **ProjectFiles Sync Table**: Implemented but requires Figma Projects API approval
 - **Projects API Request Details**:
   - Submitted: 2025-09-17
-  - Client ID: pIHjOue8Hq4btf1jfOWzDC
+  - Client ID: [CLIENT_ID_REDACTED]
   - App Name: Epic Figma to Coda
   - Requester: chris@epicosity.com
   - Status: Under review by Figma
