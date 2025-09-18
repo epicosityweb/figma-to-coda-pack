@@ -29,6 +29,60 @@ pack.setUserAuthentication({
   },
 });
 
+// Helper function for API calls with rate limit handling
+async function fetchWithRetry(context: coda.ExecutionContext, options: any, maxRetries: number = 3): Promise<any> {
+  let lastError: any;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await context.fetcher.fetch(options);
+    } catch (error) {
+      lastError = error;
+
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        const statusError = error as coda.StatusCodeError;
+
+        // If this is a rate limit error (429) or server error (5xx), retry with exponential backoff
+        if (statusError.statusCode === 429 || (statusError.statusCode >= 500 && statusError.statusCode < 600)) {
+          if (attempt < maxRetries - 1) {
+            // Exponential backoff: 1s, 2s, 4s
+            const delayMs = Math.pow(2, attempt) * 1000;
+            console.log(`Rate limit hit, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+
+            // Use a simple promise-based delay
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            continue;
+          } else {
+            // On final attempt for rate limit, provide helpful error message
+            if (statusError.statusCode === 429) {
+              throw new coda.UserVisibleError(
+                `Figma API rate limit exceeded. Please wait a few seconds and try again. ` +
+                `If this persists, consider reducing the frequency of API calls or contact Figma support.`
+              );
+            }
+          }
+        }
+      }
+
+      // For non-retryable errors, throw immediately
+      if (attempt === 0 && !coda.StatusCodeError.isStatusCodeError(error)) {
+        throw error;
+      }
+
+      // For other status code errors on first attempt, also throw immediately
+      if (attempt === 0 && coda.StatusCodeError.isStatusCodeError(error)) {
+        const statusError = error as coda.StatusCodeError;
+        if (statusError.statusCode !== 429 && !(statusError.statusCode >= 500 && statusError.statusCode < 600)) {
+          throw error;
+        }
+      }
+    }
+  }
+
+  // If we get here, all retries failed
+  throw lastError;
+}
+
 // Test formula to validate OAuth connection
 pack.addFormula({
   name: "TestConnection",
@@ -722,6 +776,81 @@ pack.addSyncTable({
       };
     },
   },
+  defaultAddDynamicColumns: false,
+  actions: [
+    {
+      name: "AddDevResource",
+      description: "Add a dev resource to this component",
+      parameters: [
+        coda.makeParameter({
+          type: coda.ParameterType.String,
+          name: "resourceName",
+          description: "Name for the dev resource",
+        }),
+        coda.makeParameter({
+          type: coda.ParameterType.String,
+          name: "resourceUrl",
+          description: "URL for the dev resource (e.g., Jira ticket, GitHub PR, documentation)",
+        }),
+      ],
+      execute: async function (params, context) {
+        const [resourceName, resourceUrl] = params;
+        const { row } = context.sync;
+
+        // Use the row data to get component information
+        const componentKey = row.key;
+        const fileKey = row.file_key;
+        const nodeId = row.node_id;
+
+        if (!componentKey || !fileKey || !nodeId) {
+          throw new coda.UserVisibleError("Component information is incomplete. Please sync the table and try again.");
+        }
+
+        // Create the dev resource using the existing CreateDevResource logic
+        let response;
+        try {
+          response = await context.fetcher.fetch({
+            method: "POST",
+            url: "https://api.figma.com/v1/dev_resources",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              dev_resources: [
+                {
+                  file_key: fileKey,
+                  node_id: nodeId,
+                  name: resourceName,
+                  url: resourceUrl,
+                },
+              ],
+            }),
+          });
+        } catch (error) {
+          if (coda.StatusCodeError.isStatusCodeError(error)) {
+            const statusError = error as coda.StatusCodeError;
+            const message = statusError.body?.message || statusError.message;
+            throw new coda.UserVisibleError(`Failed to create dev resource: ${message}`);
+          }
+          throw error;
+        }
+
+        // Check for errors in the response
+        if (response.body.errors && response.body.errors.length > 0) {
+          const errorMsg = response.body.errors[0].error;
+          throw new coda.UserVisibleError(`Failed to create dev resource: ${errorMsg}`);
+        }
+
+        // Return success message
+        const created = response.body.links_created?.[0];
+        if (!created) {
+          throw new coda.UserVisibleError("Dev resource creation failed - no resource returned");
+        }
+
+        return `✅ Created dev resource "${resourceName}" for component "${row.name}"`;
+      },
+    },
+  ],
 });
 
 // Sync table for file styles
@@ -908,6 +1037,81 @@ pack.addSyncTable({
       };
     },
   },
+  defaultAddDynamicColumns: false,
+  actions: [
+    {
+      name: "AddDevResource",
+      description: "Add a dev resource to this component set",
+      parameters: [
+        coda.makeParameter({
+          type: coda.ParameterType.String,
+          name: "resourceName",
+          description: "Name for the dev resource",
+        }),
+        coda.makeParameter({
+          type: coda.ParameterType.String,
+          name: "resourceUrl",
+          description: "URL for the dev resource (e.g., Jira ticket, GitHub PR, documentation)",
+        }),
+      ],
+      execute: async function (params, context) {
+        const [resourceName, resourceUrl] = params;
+        const { row } = context.sync;
+
+        // Use the row data to get component set information
+        const componentSetKey = row.key;
+        const fileKey = row.file_key;
+        const nodeId = row.node_id;
+
+        if (!componentSetKey || !fileKey || !nodeId) {
+          throw new coda.UserVisibleError("Component set information is incomplete. Please sync the table and try again.");
+        }
+
+        // Create the dev resource using the existing CreateDevResource logic
+        let response;
+        try {
+          response = await context.fetcher.fetch({
+            method: "POST",
+            url: "https://api.figma.com/v1/dev_resources",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              dev_resources: [
+                {
+                  file_key: fileKey,
+                  node_id: nodeId,
+                  name: resourceName,
+                  url: resourceUrl,
+                },
+              ],
+            }),
+          });
+        } catch (error) {
+          if (coda.StatusCodeError.isStatusCodeError(error)) {
+            const statusError = error as coda.StatusCodeError;
+            const message = statusError.body?.message || statusError.message;
+            throw new coda.UserVisibleError(`Failed to create dev resource: ${message}`);
+          }
+          throw error;
+        }
+
+        // Check for errors in the response
+        if (response.body.errors && response.body.errors.length > 0) {
+          const errorMsg = response.body.errors[0].error;
+          throw new coda.UserVisibleError(`Failed to create dev resource: ${errorMsg}`);
+        }
+
+        // Return success message
+        const created = response.body.links_created?.[0];
+        if (!created) {
+          throw new coda.UserVisibleError("Dev resource creation failed - no resource returned");
+        }
+
+        return `✅ Created dev resource "${resourceName}" for component set "${row.name}"`;
+      },
+    },
+  ],
 });
 
 // Sync table for team projects
@@ -1542,18 +1746,8 @@ pack.addSyncTable({
 // CreateDevResource action formula
 pack.addFormula({
   name: "CreateDevResource",
-  description: "Create a new dev resource and link it to a Figma node",
+  description: "Create a new dev resource and link it to a Figma node. Use componentKey + fileUrl for component-aware creation, or fileKey + nodeId for manual creation.",
   parameters: [
-    coda.makeParameter({
-      type: coda.ParameterType.String,
-      name: "fileKey",
-      description: "The file key where the dev resource will be created",
-    }),
-    coda.makeParameter({
-      type: coda.ParameterType.String,
-      name: "nodeId",
-      description: "The target node ID to attach the dev resource to",
-    }),
     coda.makeParameter({
       type: coda.ParameterType.String,
       name: "name",
@@ -1564,11 +1758,83 @@ pack.addFormula({
       name: "url",
       description: "The URL of the dev resource (e.g., Jira ticket, GitHub PR, documentation)",
     }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "fileKey",
+      description: "The file key where the dev resource will be created (not needed if using componentKey)",
+      optional: true,
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "nodeId",
+      description: "The target node ID to attach the dev resource to (not needed if using componentKey)",
+      optional: true,
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "componentKey",
+      description: "Optional: Component key to auto-fill file_key and node_id (from FileComponents table)",
+      optional: true,
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "fileUrl",
+      description: "Optional: Figma file URL (required when using componentKey)",
+      optional: true,
+    }),
   ],
   resultType: coda.ValueType.Object,
   schema: DevResourcesSchema,
   isAction: true,
-  execute: async function ([fileKey, nodeId, name, url], context) {
+  execute: async function ([name, url, fileKey, nodeId, componentKey, fileUrl], context) {
+    let actualFileKey = fileKey;
+    let actualNodeId = nodeId;
+
+    // If componentKey is provided, look up the component to get file_key and node_id
+    if (componentKey) {
+      if (!fileUrl) {
+        throw new coda.UserVisibleError("fileUrl is required when using componentKey");
+      }
+
+      // Extract file key from URL
+      const fileKeyMatch = fileUrl.match(/\/(?:file|design)\/([a-zA-Z0-9]+)/);
+      if (!fileKeyMatch) {
+        throw new coda.UserVisibleError("Invalid file URL format. Please provide a valid Figma file URL.");
+      }
+      const extractedFileKey = fileKeyMatch[1];
+
+      // Fetch components from the file to find the component with the matching key
+      let componentsResponse;
+      try {
+        componentsResponse = await context.fetcher.fetch({
+          method: "GET",
+          url: `https://api.figma.com/v1/files/${extractedFileKey}/components`,
+        });
+      } catch (error) {
+        if (coda.StatusCodeError.isStatusCodeError(error)) {
+          const statusError = error as coda.StatusCodeError;
+          const message = statusError.body?.message || statusError.message;
+          throw new coda.UserVisibleError(`Failed to fetch file components: ${message}`);
+        }
+        throw error;
+      }
+
+      const components = componentsResponse.body.meta?.components || [];
+      const targetComponent = components.find((c: any) => c.key === componentKey);
+
+      if (!targetComponent) {
+        throw new coda.UserVisibleError(`Component with key "${componentKey}" not found in file. Make sure the component exists and the file URL is correct.`);
+      }
+
+      actualFileKey = targetComponent.file_key;
+      actualNodeId = targetComponent.node_id;
+    } else {
+      // Traditional mode - validate required parameters
+      if (!fileKey || !nodeId) {
+        throw new coda.UserVisibleError("Either provide componentKey + fileUrl, or fileKey + nodeId");
+      }
+    }
+
     let response;
     try {
       response = await context.fetcher.fetch({
@@ -1580,8 +1846,8 @@ pack.addFormula({
         body: JSON.stringify({
           dev_resources: [
             {
-              file_key: fileKey,
-              node_id: nodeId,
+              file_key: actualFileKey,
+              node_id: actualNodeId,
               name: name,
               url: url,
             },
@@ -1899,6 +2165,168 @@ pack.addFormula({
       updated: updated,
       errors: errors,
       details: `Updated ${updated} resources, ${errors} errors`,
+    };
+  },
+});
+
+// AddDevResourceToComponent action formula
+pack.addFormula({
+  name: "AddDevResourceToComponent",
+  description: "Create a dev resource linked to a specific component using component context. Supports templates for standardized URL patterns.",
+  parameters: [
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "componentKey",
+      description: "The component key (from FileComponents table)",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "resourceName",
+      description: "Name for the dev resource",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "fileUrl",
+      description: "Figma file URL (to determine file context)",
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "resourceUrl",
+      description: "URL for the dev resource (leave empty to use template)",
+      optional: true,
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "template",
+      description: "Optional template: 'storybook', 'github', 'jira', 'confluence', or 'custom'",
+      optional: true,
+    }),
+    coda.makeParameter({
+      type: coda.ParameterType.String,
+      name: "baseUrl",
+      description: "Base URL for custom template (e.g., 'https://company.atlassian.net/browse/')",
+      optional: true,
+    }),
+  ],
+  resultType: coda.ValueType.Object,
+  schema: DevResourcesSchema,
+  isAction: true,
+  execute: async function ([componentKey, resourceName, fileUrl, resourceUrl, template, baseUrl], context) {
+    // Extract file key from URL
+    const fileKeyMatch = fileUrl.match(/\/(?:file|design)\/([a-zA-Z0-9]+)/);
+    if (!fileKeyMatch) {
+      throw new coda.UserVisibleError("Invalid file URL format. Please provide a valid Figma file URL.");
+    }
+    const fileKey = fileKeyMatch[1];
+
+    // Fetch components from the file to find the component with the matching key (with rate limit handling)
+    let componentsResponse;
+    try {
+      componentsResponse = await fetchWithRetry(context, {
+        method: "GET",
+        url: `https://api.figma.com/v1/files/${fileKey}/components`,
+      });
+    } catch (error) {
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        const statusError = error as coda.StatusCodeError;
+        const message = statusError.body?.message || statusError.message;
+        throw new coda.UserVisibleError(`Failed to fetch file components: ${message}`);
+      }
+      throw error;
+    }
+
+    const components = componentsResponse.body.meta?.components || [];
+    const targetComponent = components.find((c: any) => c.key === componentKey);
+
+    if (!targetComponent) {
+      throw new coda.UserVisibleError(`Component with key "${componentKey}" not found in file. Make sure the component exists and the file URL is correct.`);
+    }
+
+    // Generate URL from template if resourceUrl is not provided
+    let finalResourceUrl = resourceUrl;
+    if (!resourceUrl && template) {
+      const componentName = targetComponent.name;
+      const componentNameSlug = componentName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+      switch (template.toLowerCase()) {
+        case 'storybook':
+          finalResourceUrl = `https://storybook.example.com/?path=/story/${componentNameSlug}`;
+          break;
+        case 'github':
+          finalResourceUrl = `https://github.com/org/repo/tree/main/components/${componentNameSlug}`;
+          break;
+        case 'jira':
+          finalResourceUrl = baseUrl ? `${baseUrl}${componentNameSlug.toUpperCase()}` : `https://company.atlassian.net/browse/${componentNameSlug.toUpperCase()}`;
+          break;
+        case 'confluence':
+          finalResourceUrl = baseUrl ? `${baseUrl}${componentNameSlug}` : `https://company.atlassian.net/wiki/spaces/DESIGN/pages/${componentNameSlug}`;
+          break;
+        case 'custom':
+          if (!baseUrl) {
+            throw new coda.UserVisibleError("baseUrl is required when using 'custom' template");
+          }
+          finalResourceUrl = `${baseUrl}${componentNameSlug}`;
+          break;
+        default:
+          throw new coda.UserVisibleError(`Unknown template: ${template}. Use 'storybook', 'github', 'jira', 'confluence', or 'custom'`);
+      }
+    }
+
+    if (!finalResourceUrl) {
+      throw new coda.UserVisibleError("Either provide resourceUrl or use a template to generate the URL");
+    }
+
+    // Now create the dev resource using the found component's file_key and node_id (with rate limit handling)
+    let response;
+    try {
+      response = await fetchWithRetry(context, {
+        method: "POST",
+        url: "https://api.figma.com/v1/dev_resources",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dev_resources: [
+            {
+              file_key: targetComponent.file_key,
+              node_id: targetComponent.node_id,
+              name: resourceName,
+              url: finalResourceUrl,
+            },
+          ],
+        }),
+      });
+    } catch (error) {
+      if (coda.StatusCodeError.isStatusCodeError(error)) {
+        const statusError = error as coda.StatusCodeError;
+        const message = statusError.body?.message || statusError.message;
+        throw new coda.UserVisibleError(`Failed to create dev resource: ${message}`);
+      }
+      throw error;
+    }
+
+    // Check for errors in the response
+    if (response.body.errors && response.body.errors.length > 0) {
+      const errorMsg = response.body.errors[0].error;
+      throw new coda.UserVisibleError(`Failed to create dev resource: ${errorMsg}`);
+    }
+
+    // Return the created resource
+    const created = response.body.links_created?.[0];
+    if (!created) {
+      throw new coda.UserVisibleError("Dev resource creation failed - no resource returned");
+    }
+
+    const now = new Date().toISOString();
+    return {
+      id: created.id,
+      name: created.name,
+      url: created.url,
+      file_key: created.file_key,
+      node_id: created.node_id,
+      created_at: now,
+      updated_at: now,
+      link: `https://www.figma.com/file/${created.file_key}?node-id=${encodeURIComponent(created.node_id)}`,
     };
   },
 });

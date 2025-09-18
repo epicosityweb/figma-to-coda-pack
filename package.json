@@ -33,7 +33,7 @@
     "node": ">=16.0.0"
   },
   "coda": {
-    "packId": "YOUR_PACK_ID_HERE",
-    "packVersion": "1"
+    "packId": "44800",
+    "packVersion": "16"
   }
 }
